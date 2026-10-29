@@ -17,6 +17,7 @@ import { ILLUSTRATIVE_STATE } from "@/lib/scene/illustrative-state";
 import { DEFAULT_VIEW, type ViewSettings } from "@/lib/scene/view-settings";
 import type { TabKey } from "@/types/dashboard";
 import { CausalTimeline } from "./causal-timeline";
+import { ComparePanel } from "./compare-panel";
 import { DisruptionModal } from "./disruption-modal";
 import { FacilityPanel } from "./facility-panel";
 import { GuidedDemo } from "./guided-demo";
@@ -68,6 +69,27 @@ export const DashboardLayout = () => {
     recording,
   } = useRun();
 
+  // Disruptions applied to the current run, replayed onto the baseline (B7).
+  const [applied, setApplied] = useState<DisruptionBody[]>([]);
+  const trackedDisrupt = useCallback(
+    async (body: DisruptionBody) => {
+      const result = await disrupt(body);
+      if (!result.error) setApplied((prev) => [...prev, body]);
+      return result;
+    },
+    [disrupt],
+  );
+  const trackedStart = useCallback(
+    async (mode: "live" | "baseline") => {
+      setApplied([]);
+      return start(mode);
+    },
+    [start],
+  );
+  const compareDisruptions = recording
+    ? recording.disruptions.map((d) => d.body)
+    : applied;
+
   // ?replay=d108 opens the recorded run directly: the hosted-demo entry point.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("replay") === "d108") {
@@ -93,11 +115,11 @@ export const DashboardLayout = () => {
 
   const guidedActions = useMemo<GuidedActions>(
     () => ({
-      start: () => start("live"),
-      disrupt,
+      start: () => trackedStart("live"),
+      disrupt: trackedDisrupt,
       step,
     }),
-    [start, disrupt, step],
+    [trackedStart, trackedDisrupt, step],
   );
 
   const showToast = useCallback((msg: string) => {
@@ -123,7 +145,7 @@ export const DashboardLayout = () => {
     async (disruptionId: string) => {
       const body = DISRUPTIONS[disruptionId];
       if (!body) return;
-      const result = await disrupt(body);
+      const result = await trackedDisrupt(body);
       showToast(
         result.error
           ? `Disruption ${disruptionId} not applied: ${result.error}`
@@ -131,7 +153,7 @@ export const DashboardLayout = () => {
       );
       if (!result.error) handleSelectEntity(body.targetId);
     },
-    [disrupt, handleSelectEntity, showToast],
+    [trackedDisrupt, handleSelectEntity, showToast],
   );
 
   const handleStep = useCallback(async () => {
@@ -235,11 +257,15 @@ export const DashboardLayout = () => {
           status={status}
           error={error}
           busy={busy}
-          onStartNew={() => start("live")}
+          onStartNew={() => trackedStart("live")}
           onRetry={refresh}
           onWatchRecording={() => void replayRecorded()}
         />
         {recording && <ReplayBanner recording={recording} />}
+        <ComparePanel
+          agentsSnapshot={snapshot}
+          disruptions={compareDisruptions}
+        />
 
         <div className="relative min-h-0 flex-1">
           <FacilityPanel
