@@ -2,6 +2,7 @@
 
 import { TextureButton } from "@/components/ui/texture-button";
 import type { RunStatus } from "@/lib/dashboard/project-run";
+import { NO_RECORDING } from "@/lib/dashboard/replay";
 
 interface RunNoticeProps {
   status: RunStatus;
@@ -9,12 +10,12 @@ interface RunNoticeProps {
   busy: boolean;
   onStartNew: () => void;
   onRetry: () => void;
+  onWatchRecording: () => void;
 }
 
 /**
  * Review Focus 5: an unknown or expired run (e.g. after a server restart) is
- * said plainly and offers a new run. "Watch recorded run" is B8: it needs the
- * recorded snapshot under /runs and a replay button wired to useRun().replay.
+ * said plainly and offers a new run or the recorded run (B8).
  */
 export const RunNotice = ({
   status,
@@ -22,6 +23,7 @@ export const RunNotice = ({
   busy,
   onStartNew,
   onRetry,
+  onWatchRecording,
 }: RunNoticeProps) => {
   if (status === "missing") {
     return (
@@ -42,7 +44,26 @@ export const RunNotice = ({
         >
           Start new run
         </TextureButton>
-        {/* TODO(B8): "Watch recorded run" -> useRun().replay("/runs/<recording>.json") */}
+        <TextureButton
+          variant="minimal"
+          size="sm"
+          className="w-auto"
+          disabled={busy}
+          onClick={onWatchRecording}
+        >
+          Watch recorded run
+        </TextureButton>
+      </div>
+    );
+  }
+  if (error === NO_RECORDING) {
+    return (
+      <div
+        role="alert"
+        className="pointer-events-auto rounded-lg border border-zinc-400/60 bg-zinc-50/95 px-3 py-1.5 text-xs text-zinc-900 shadow-sm dark:bg-zinc-900/90 dark:text-zinc-200"
+      >
+        No recording yet: no recorded run has been published with this build.
+        Start a live run instead.
       </div>
     );
   }
