@@ -57,9 +57,9 @@ export const DisruptionModal = ({
               <ProvenanceBadge kind="hyp">injected</ProvenanceBadge>
             </div>
             <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mb-2">
-              Close dock door D-108 for 2 hours (14:00–16:00). Pauses active
-              unloading on trailer T-2291, forcing agents to negotiate
-              reassignment.
+              Close dock door D-108. Pauses active unloading on trailer T-2291,
+              forcing agents to negotiate reassignment. The engine does not
+              model a closure duration.
             </p>
             <TextureButton
               variant="destructive"
@@ -80,8 +80,8 @@ export const DisruptionModal = ({
               <ProvenanceBadge kind="hyp">ready</ProvenanceBadge>
             </div>
             <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mb-2">
-              Declare forklift F-07 hydraulic fault. Releases active pallet task
-              and requires crew lead reassignment.
+              Declare forklift F-07 failed. The engine marks the equipment
+              failed; the cause is not modeled.
             </p>
             <TextureButton
               variant="minimal"
@@ -98,12 +98,13 @@ export const DisruptionModal = ({
           {/* H-3 */}
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2.5 dark:border-zinc-800 dark:bg-zinc-950/40 text-xs">
             <div className="flex justify-between items-baseline mb-1">
-              <span className="font-semibold">Driver Delay (H-3)</span>
+              <span className="font-semibold">External Delay (H-3)</span>
               <ProvenanceBadge kind="hyp">ready</ProvenanceBadge>
             </div>
             <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mb-2">
-              Driver DRV-047 reports 45 min highway delay; triggers slot swap
-              proposal with waiting carrier.
+              Record an external delay on trailer T-2291. Recorded as an event
+              only; the delay length is unknown and the engine does not apply
+              it.
             </p>
             <TextureButton
               variant="minimal"

@@ -1,163 +1,116 @@
 "use client";
 
+import { formatClock } from "@/lib/dashboard/project-run";
+import type { CommitmentEntity } from "@/lib/engine/types";
 import { ProvenanceBadge } from "../provenance-badge";
 
 interface CommitmentTabProps {
+  commitments: readonly CommitmentEntity[];
   onSelectEntity: (id: string) => void;
 }
 
-export const CommitmentTab = ({ onSelectEntity }: CommitmentTabProps) => {
-  return (
-    <div className="space-y-3 p-3 text-xs">
-      <section>
-        <div className="flex items-center justify-between">
-          <span className="font-semibold text-sm">Commitment C-88</span>
-          <ProvenanceBadge kind="ill">illus→sim</ProvenanceBadge>
-        </div>
-        <div className="text-zinc-500 text-[11px]">
-          Committed atomically · engine v3815 · 14:05:02
-        </div>
-      </section>
-
-      {/* Metadata */}
-      <dl className="grid grid-cols-[80px_1fr] gap-x-2 gap-y-1 text-xs border-y border-zinc-200 py-2 dark:border-zinc-800">
-        <dt className="text-zinc-500">Task</dt>
-        <dd className="text-zinc-800 dark:text-zinc-200">
-          Relocate{" "}
-          <button
-            type="button"
-            onClick={() => onSelectEntity("T-2291")}
-            className="font-mono text-blue-600 underline"
-          >
-            T-2291
-          </button>{" "}
-          from{" "}
-          <button
-            type="button"
-            onClick={() => onSelectEntity("D-108")}
-            className="font-mono text-amber-600 underline"
-          >
-            D-108
-          </button>{" "}
-          →{" "}
-          <button
-            type="button"
-            onClick={() => onSelectEntity("D-112")}
-            className="font-mono text-blue-600 underline"
-          >
-            D-112
-          </button>
-          , resume unload (13 of 22 pallets left)
-        </dd>
-
-        <dt className="text-zinc-500">Expiry</dt>
-        <dd className="font-mono text-[11px] text-zinc-700 dark:text-zinc-300">
-          Offer M-311 expires 14:12 · accepted 14:04:40
-        </dd>
-
-        <dt className="text-zinc-500">Outcome</dt>
-        <dd className="text-emerald-700 dark:text-emerald-400 font-medium">
-          In progress · A-902 move started 14:06:10 · arrival pending
-        </dd>
-      </dl>
-
-      {/* Participants */}
-      <section>
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">
-          Participating Agents
-        </div>
-        <table className="w-full text-xs border border-zinc-200 dark:border-zinc-800 rounded-md overflow-hidden">
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            <tr className="bg-zinc-50/50 dark:bg-zinc-950/20">
-              <td className="px-2 py-1 font-mono font-medium">DRV-047</td>
-              <td className="px-2 py-1 text-zinc-500">driver</td>
-              <td className="px-2 py-1 text-emerald-600">accepted M-312</td>
-            </tr>
-            <tr>
-              <td className="px-2 py-1 font-mono font-medium">DOCK-C</td>
-              <td className="px-2 py-1 text-zinc-500">dock lead</td>
-              <td className="px-2 py-1 text-blue-600">offered M-311</td>
-            </tr>
-            <tr className="bg-zinc-50/50 dark:bg-zinc-950/20">
-              <td className="px-2 py-1 font-mono font-medium">YARD-1</td>
-              <td className="px-2 py-1 text-zinc-500">yard ctrl</td>
-              <td className="px-2 py-1 text-emerald-600">accepted M-313</td>
-            </tr>
-            <tr>
-              <td className="px-2 py-1 font-mono font-medium">CREW-3</td>
-              <td className="px-2 py-1 text-zinc-500">crew lead</td>
-              <td className="px-2 py-1 text-emerald-600">accepted M-314</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      {/* Reserved Resources */}
-      <section>
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">
-          Resource Reservations
-        </div>
-        <table className="w-full text-xs border border-zinc-200 dark:border-zinc-800 rounded-md overflow-hidden">
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            <tr className="bg-zinc-50/50 dark:bg-zinc-950/20">
-              <td className="px-2 py-1 font-mono">
-                <button
-                  type="button"
-                  onClick={() => onSelectEntity("D-112")}
-                  className="text-blue-600 underline font-mono"
-                >
-                  D-112
-                </button>
-              </td>
-              <td className="px-2 py-1 font-mono text-zinc-500">14:20–15:05</td>
-              <td className="px-2 py-1 text-emerald-600 font-medium">
-                reserved
-              </td>
-            </tr>
-            <tr>
-              <td className="px-2 py-1 font-mono">
-                <button
-                  type="button"
-                  onClick={() => onSelectEntity("YT-2")}
-                  className="text-blue-600 underline font-mono"
-                >
-                  YT-2
-                </button>
-              </td>
-              <td className="px-2 py-1 font-mono text-zinc-500">14:06–14:20</td>
-              <td className="px-2 py-1 text-blue-600 font-medium">
-                in use (A-902)
-              </td>
-            </tr>
-            <tr className="bg-zinc-50/50 dark:bg-zinc-950/20">
-              <td className="px-2 py-1 font-mono">CR-3</td>
-              <td className="px-2 py-1 font-mono text-zinc-500">14:20–15:05</td>
-              <td className="px-2 py-1 text-emerald-600 font-medium">
-                reserved
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      {/* Negotiation Rejections */}
-      <section>
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">
-          Prior Rejections
-        </div>
-        <div className="rounded-md border border-red-200 bg-red-50/40 p-2 dark:border-red-950 dark:bg-red-950/20 text-zinc-700 dark:text-zinc-300">
-          <div className="flex items-center gap-1.5 font-medium text-red-700 dark:text-red-400">
-            <span className="rounded bg-red-100 px-1 font-mono text-[10px] dark:bg-red-900/60">
-              REJECTED
-            </span>
-            <span>A-894 · STALE_VERSION</span>
-          </div>
-          <p className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400">
-            YARD-1 requested D-109 at 14:01:30 with state v3809; engine rejected
-            because D-109 was already committed to C-86 in v3811.
-          </p>
-        </div>
-      </section>
-    </div>
-  );
+const STATUS_STYLE: Partial<Record<CommitmentEntity["status"], string>> = {
+  committed: "text-emerald-700 dark:text-emerald-400",
+  executing: "text-emerald-700 dark:text-emerald-400",
+  completed: "text-emerald-700 dark:text-emerald-400",
+  rejected: "text-red-700 dark:text-red-400",
+  cancelled: "text-red-700 dark:text-red-400",
 };
+
+const CommitmentCard = ({
+  commitment: c,
+  onSelectEntity,
+}: {
+  commitment: CommitmentEntity;
+  onSelectEntity: (id: string) => void;
+}) => (
+  <section className="space-y-2 rounded-md border border-zinc-200 p-2.5 dark:border-zinc-800">
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-semibold">Commitment {c.id}</span>
+      <span
+        className={`font-mono text-[11px] font-medium ${STATUS_STYLE[c.status] ?? "text-blue-600 dark:text-blue-400"}`}
+      >
+        {c.status}
+      </span>
+    </div>
+    <div className="text-[11px] text-zinc-500">
+      engine v{c.stateVersion} · created {formatClock(c.createdAt)} · expires{" "}
+      {formatClock(c.expiresAt)}
+      {c.committedAt !== undefined
+        ? ` · committed ${formatClock(c.committedAt)}`
+        : ""}
+    </div>
+    <p className="text-zinc-800 dark:text-zinc-200">{c.task}</p>
+    {c.rejectionReason && (
+      <p className="font-mono text-[11px] text-red-700 dark:text-red-400">
+        {c.rejectionReason}
+      </p>
+    )}
+    <table className="w-full overflow-hidden rounded-md border border-zinc-200 text-xs dark:border-zinc-800">
+      <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        {c.participants.map((p) => (
+          <tr key={p.agentId}>
+            <td className="px-2 py-1 font-mono font-medium">{p.agentId}</td>
+            <td className="px-2 py-1 text-zinc-500">{p.role}</td>
+            <td
+              className={`px-2 py-1 ${p.accepted ? "text-emerald-600" : "text-zinc-400"}`}
+            >
+              {p.accepted ? "accepted" : "pending"}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {c.requiredResources.length > 0 && (
+      <table className="w-full overflow-hidden rounded-md border border-zinc-200 text-xs dark:border-zinc-800">
+        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          {c.requiredResources.map((r) => (
+            <tr key={`${r.resourceId}-${r.startWindow}`}>
+              <td className="px-2 py-1 font-mono">
+                <button
+                  type="button"
+                  onClick={() => onSelectEntity(r.resourceId)}
+                  className="font-mono text-blue-600 underline"
+                >
+                  {r.resourceId}
+                </button>
+              </td>
+              <td className="px-2 py-1 font-mono text-zinc-500">
+                {formatClock(r.startWindow)}–{formatClock(r.endWindow)}
+              </td>
+              <td className="px-2 py-1 text-zinc-500">{r.type}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </section>
+);
+
+export const CommitmentTab = ({
+  commitments,
+  onSelectEntity,
+}: CommitmentTabProps) => (
+  <div className="space-y-3 p-3 text-xs">
+    <div className="flex items-center justify-between">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+        Engine commitments ({commitments.length})
+      </span>
+      <ProvenanceBadge kind="drv">engine</ProvenanceBadge>
+    </div>
+    {commitments.length === 0 ? (
+      <div className="rounded-md border border-zinc-200 p-2 italic text-zinc-400 dark:border-zinc-800">
+        No commitments yet. Rejected tool calls appear in the timeline with
+        their reason code.
+      </div>
+    ) : (
+      commitments.map((c) => (
+        <CommitmentCard
+          key={c.id}
+          commitment={c}
+          onSelectEntity={onSelectEntity}
+        />
+      ))
+    )}
+  </div>
+);

@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { callBadgeOf, provenanceOfCall } from "@/lib/dashboard/call-badge";
 import { TIMELINE_EVENTS } from "@/lib/dashboard/data";
+import type { RunTimelineEvent } from "@/lib/dashboard/project-run";
 import type { TimelineEvent, TimelineEventType } from "@/types/dashboard";
+import type { ModelCall } from "@/types/run";
+import { ModelCallBadge } from "./call-badge";
 import { ProvenanceBadge } from "./provenance-badge";
 
 const CARD_STYLES: Record<TimelineEventType, string> = {
@@ -24,14 +28,34 @@ const CARD_STYLES: Record<TimelineEventType, string> = {
     "border-dashed border-zinc-400 dark:border-zinc-700 bg-zinc-50/40 dark:bg-zinc-950/20 text-zinc-500",
 };
 
+/** A run event, or an illustrative one (which has no run provenance). */
+type TimelineItem = TimelineEvent & Partial<RunTimelineEvent>;
+
 interface CausalTimelineProps {
-  events?: readonly TimelineEvent[];
+  /** Projected run events; the illustrative preview only when there is no run. */
+  events?: readonly TimelineItem[];
+  /** The run's model calls, so a turn can show its model, latency and tokens. */
+  calls?: readonly ModelCall[];
+  /** True when the events come from a server run. */
+  fromRun?: boolean;
 }
 
+interface TurnBadgeProps {
+  call: ModelCall;
+  events: readonly TimelineItem[];
+}
+
+/** The model call behind a turn: source, model, tier, latency and tokens. */
+const TurnBadge = ({ call, events }: TurnBadgeProps) => {
+  const provenance = provenanceOfCall(
+    call,
+    events.filter((e): e is RunTimelineEvent => e.provenance !== undefined),
+  );
+  return <ModelCallBadge badge={callBadgeOf(call, provenance)} />;
+};
+
 /** The newest event that has happened; scheduled ones are still in the future. */
-const latestOf = (
-  events: readonly TimelineEvent[],
-): TimelineEvent | undefined =>
+const latestOf = (events: readonly TimelineItem[]): TimelineItem | undefined =>
   events.findLast((e) => e.type !== "scheduled") ?? events[0];
 
 /**
@@ -40,9 +64,12 @@ const latestOf = (
  */
 export const CausalTimeline = ({
   events = TIMELINE_EVENTS,
+  calls = [],
+  fromRun = false,
 }: CausalTimelineProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const latest = latestOf(events);
+  const callsById = new Map(calls.map((c) => [c.id, c]));
 
   return (
     <>
@@ -65,7 +92,11 @@ export const CausalTimeline = ({
         ) : (
           <span>No events yet</span>
         )}
-        <ProvenanceBadge kind="ill">illus→sim</ProvenanceBadge>
+        {fromRun ? (
+          <ProvenanceBadge kind="drv">run</ProvenanceBadge>
+        ) : (
+          <ProvenanceBadge kind="ill">illustrative</ProvenanceBadge>
+        )}
       </button>
 
       {isOpen && (
@@ -75,7 +106,9 @@ export const CausalTimeline = ({
         >
           <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-500">
             <span className="font-semibold uppercase tracking-wider">
-              Causal timeline · Disruption H-1 → Commitment C-88
+              {fromRun
+                ? `Causal timeline · ${events.length} run events`
+                : "Causal timeline · illustrative preview, no run yet"}
             </span>
             <span className="hidden font-mono sm:inline">
               Inference reported separately from logical time
@@ -94,11 +127,6 @@ export const CausalTimeline = ({
                     {evt.tag && (
                       <ProvenanceBadge kind="hyp">{evt.tag}</ProvenanceBadge>
                     )}
-                    {evt.isLLM && (
-                      <span className="rounded bg-blue-100 px-1 text-[9px] font-semibold text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
-                        LLM
-                      </span>
-                    )}
                   </div>
                   <div className="font-mono text-[11px] font-semibold">
                     {evt.source}
@@ -106,6 +134,17 @@ export const CausalTimeline = ({
                   <div className="max-w-44 truncate" title={evt.title}>
                     {evt.title}
                   </div>
+                  {evt.reasonCode && (
+                    <div className="font-mono text-[10px] font-semibold text-red-700 dark:text-red-400">
+                      {evt.reasonCode}
+                    </div>
+                  )}
+                  {evt.modelCallId && callsById.has(evt.modelCallId) && (
+                    <TurnBadge
+                      call={callsById.get(evt.modelCallId) as ModelCall}
+                      events={events}
+                    />
+                  )}
                 </div>
                 {idx < events.length - 1 && (
                   <span className="select-none text-xs text-zinc-400">→</span>

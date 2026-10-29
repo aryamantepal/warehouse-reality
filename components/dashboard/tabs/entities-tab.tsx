@@ -3,11 +3,13 @@
 import { useMemo, useState } from "react";
 import { getEntitiesForFilter } from "@/lib/dashboard/data";
 import { statusText } from "@/lib/scene/status-text";
+import type { SceneState } from "@/lib/scene/types";
 import type { EntityFilter } from "@/types/dashboard";
 
 interface EntitiesTabProps {
   selectedId: string | null;
   onSelectEntity: (id: string) => void;
+  sceneState: SceneState;
 }
 
 const FILTER_LABELS: Record<EntityFilter, string> = {
@@ -20,10 +22,14 @@ const FILTER_LABELS: Record<EntityFilter, string> = {
 export const EntitiesTab = ({
   selectedId,
   onSelectEntity,
+  sceneState,
 }: EntitiesTabProps) => {
   const [filter, setFilter] = useState<EntityFilter>("doors");
 
-  const entities = useMemo(() => getEntitiesForFilter(filter), [filter]);
+  const entities = useMemo(
+    () => getEntitiesForFilter(filter, sceneState),
+    [filter, sceneState],
+  );
 
   return (
     <div className="flex h-full flex-col p-3 text-xs gap-2">

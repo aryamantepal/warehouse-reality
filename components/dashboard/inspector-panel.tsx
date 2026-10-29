@@ -1,7 +1,7 @@
 "use client";
 
-import type { AgentState, DeliberationResult } from "@/lib/agents/types";
-import type { CommitmentEntity } from "@/lib/engine/types";
+import type { DashboardView } from "@/lib/dashboard/project-run";
+import type { SceneState } from "@/lib/scene/types";
 import type { TabKey } from "@/types/dashboard";
 import { AgentTab } from "./tabs/agent-tab";
 import { CommitmentTab } from "./tabs/commitment-tab";
@@ -15,13 +15,11 @@ interface InspectorPanelProps {
   onToggle: () => void;
   onSelectTab: (tab: TabKey) => void;
   onSelectEntity: (id: string) => void;
-  agents?: AgentState[];
-  activeAgentId?: string;
-  onSelectAgent?: (id: string) => void;
-  onTriggerDeliberation?: (id?: string) => Promise<unknown>;
-  isDeliberating?: boolean;
-  lastDeliberation?: DeliberationResult | null;
-  commitments?: CommitmentEntity[];
+  /** The projected run, or null before a run exists. */
+  view: DashboardView | null;
+  sceneState: SceneState;
+  activeAgentId: string | null;
+  onSelectAgent: (id: string) => void;
 }
 
 export const InspectorPanel = ({
@@ -31,12 +29,10 @@ export const InspectorPanel = ({
   onToggle,
   onSelectTab,
   onSelectEntity,
-  agents,
+  view,
+  sceneState,
   activeAgentId,
   onSelectAgent,
-  onTriggerDeliberation,
-  isDeliberating,
-  lastDeliberation,
 }: InspectorPanelProps) => {
   if (!isOpen) return null;
 
@@ -86,24 +82,25 @@ export const InspectorPanel = ({
       <div className="flex-1 min-h-0 overflow-y-auto">
         {activeTab === "agent" && (
           <AgentTab
+            view={view}
             onSelectEntity={onSelectEntity}
             onSwitchTab={() => onSelectTab("commitment")}
-            agents={agents}
             activeAgentId={activeAgentId}
             onSelectAgent={onSelectAgent}
-            onTriggerDeliberation={onTriggerDeliberation}
-            isDeliberating={isDeliberating}
-            lastDeliberation={lastDeliberation}
           />
         )}
         {activeTab === "commitment" && (
-          <CommitmentTab onSelectEntity={onSelectEntity} />
+          <CommitmentTab
+            commitments={view?.commitments ?? []}
+            onSelectEntity={onSelectEntity}
+          />
         )}
         {activeTab === "evidence" && <EvidenceTab />}
         {activeTab === "entities" && (
           <EntitiesTab
             selectedId={selectedId}
             onSelectEntity={onSelectEntity}
+            sceneState={sceneState}
           />
         )}
       </div>

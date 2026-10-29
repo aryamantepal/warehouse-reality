@@ -4,8 +4,6 @@ import {
   Ellipsis,
   PanelLeft,
   PanelRight,
-  Pause,
-  Play,
   SkipForward,
   Zap,
 } from "lucide-react";
@@ -20,12 +18,13 @@ const MENU_ITEM =
   "inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors duration-150 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-zinc-800";
 
 interface TopBarProps {
-  logicalTime: string;
-  isPaused: boolean;
+  /** Logical clock from the run, or null before a run exists. */
+  logicalTime: string | null;
+  /** True while a request to the run API is in flight. */
+  busy: boolean;
+  canStep: boolean;
   speed: 1 | 4 | 16;
-  isDeliberating?: boolean;
-  onTogglePause: () => void;
-  onNextEvent: () => void;
+  onStep: () => void;
   onChangeSpeed: (speed: 1 | 4 | 16) => void;
   onOpenDisruptionModal: () => void;
 }
@@ -33,19 +32,18 @@ interface TopBarProps {
 /** Name, logical clock and run controls: the only chrome that stays on screen. */
 export const TopBar = ({
   logicalTime,
-  isPaused,
+  busy,
+  canStep,
   speed,
-  isDeliberating = false,
-  onTogglePause,
-  onNextEvent,
+  onStep,
   onChangeSpeed,
   onOpenDisruptionModal,
 }: TopBarProps) => {
-  const status = isDeliberating
-    ? "NVIDIA model deliberating"
-    : isPaused
-      ? "Paused · agents standby"
-      : "Running";
+  const status = busy
+    ? "Waiting on the run"
+    : logicalTime === null
+      ? "No run yet · illustrative preview"
+      : "Run ready";
   return (
     <header className={PILL}>
       <span className="flex items-center gap-2 px-1.5">
@@ -62,25 +60,18 @@ export const TopBar = ({
         title={status}
       >
         <span
-          className={`size-1.5 rounded-full bg-blue-500 ${isDeliberating ? "animate-ping" : isPaused ? "" : "animate-pulse"}`}
+          className={`size-1.5 rounded-full bg-blue-500 ${busy ? "animate-ping" : ""}`}
         />
         <span className="sr-only">{status} · </span>
-        Day 1 · {logicalTime}
+        {logicalTime === null ? "No run" : `Day 1 · ${logicalTime}`}
       </span>
       <TextureButton
         variant="icon"
         size="icon"
-        onClick={onTogglePause}
-        aria-label={isPaused ? "Resume simulation" : "Pause simulation"}
-      >
-        {isPaused ? <Play className={ICON} /> : <Pause className={ICON} />}
-      </TextureButton>
-      <TextureButton
-        variant="icon"
-        size="icon"
-        onClick={onNextEvent}
-        aria-label="Advance to the next scheduled event"
-        title="Next event"
+        disabled={!canStep}
+        onClick={onStep}
+        aria-label="Step the run"
+        title="Step the run (up to 4 agent turns)"
       >
         <SkipForward className={ICON} />
       </TextureButton>
@@ -122,7 +113,6 @@ interface ViewMenuProps {
   onToggleFacility: () => void;
   onToggleInspector: () => void;
   onOpenEvidence: () => void;
-  onCheckpoint: () => void;
   /** The scene settings button and its pane. */
   settings: ReactNode;
 }
@@ -130,15 +120,10 @@ interface ViewMenuProps {
 interface MoreMenuProps {
   unknownCount: number;
   onOpenEvidence: () => void;
-  onCheckpoint: () => void;
 }
 
 /** The "⋯" menu: closes on a pick, an outside press or Escape (which then stops there). */
-const MoreMenu = ({
-  unknownCount,
-  onOpenEvidence,
-  onCheckpoint,
-}: MoreMenuProps) => {
+const MoreMenu = ({ unknownCount, onOpenEvidence }: MoreMenuProps) => {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -179,14 +164,6 @@ const MoreMenu = ({
           >
             Evidence · {unknownCount} unknowns
           </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={pick(onCheckpoint)}
-            className={MENU_ITEM}
-          >
-            ⚑ Checkpoint
-          </button>
         </div>
       )}
     </div>
@@ -201,7 +178,6 @@ export const ViewMenu = ({
   onToggleFacility,
   onToggleInspector,
   onOpenEvidence,
-  onCheckpoint,
   settings,
 }: ViewMenuProps) => (
   <nav className={`${PILL} ml-auto`} aria-label="Panels">
@@ -226,10 +202,6 @@ export const ViewMenu = ({
       Inspector
     </TextureButton>
     {settings}
-    <MoreMenu
-      unknownCount={unknownCount}
-      onOpenEvidence={onOpenEvidence}
-      onCheckpoint={onCheckpoint}
-    />
+    <MoreMenu unknownCount={unknownCount} onOpenEvidence={onOpenEvidence} />
   </nav>
 );

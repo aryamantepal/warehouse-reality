@@ -2,7 +2,7 @@ import {
   ILLUSTRATIVE_STATE,
   MOVING_TRAILER,
 } from "@/lib/scene/illustrative-state";
-import type { Entity } from "@/lib/scene/types";
+import type { DoorStatus, Entity, SceneState } from "@/lib/scene/types";
 import type {
   DashboardCounts,
   Dependency,
@@ -175,10 +175,16 @@ export const calculateDashboardCounts = (): DashboardCounts => {
   };
 };
 
+/** Ids of the doors (not ramps) in one status, e.g. the closed ones. */
+export const doorIdsWithStatus = (
+  state: SceneState,
+  status: DoorStatus,
+): string[] => state.doors.filter((d) => d.status === status).map((d) => d.id);
+
 export const getEntitiesForFilter = (
   filter: "doors" | "stalls" | "trailers" | "equipment",
+  state: SceneState = ILLUSTRATIVE_STATE,
 ): readonly Entity[] => {
-  const state = ILLUSTRATIVE_STATE;
   switch (filter) {
     case "doors":
       return [...state.doors, ...state.ramps];

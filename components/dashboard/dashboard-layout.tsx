@@ -1,18 +1,35 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { SceneStatus } from "@/components/scene/facility-scene";
 import { SceneLoader } from "@/components/scene/scene-loader";
-import { UNKNOWN_DFW_FIELDS } from "@/lib/dashboard/data";
-import { useSimulation } from "@/lib/dashboard/use-simulation";
+import {
+  calculateDashboardCounts,
+  doorIdsWithStatus,
+  UNKNOWN_DFW_FIELDS,
+} from "@/lib/dashboard/data";
+import type { GuidedActions } from "@/lib/dashboard/guided-demo";
+import { useRun } from "@/lib/dashboard/use-run";
+import type { DisruptionBody } from "@/lib/run/api-schemas";
+import { sceneStateFromEngine } from "@/lib/scene/from-engine";
+import { ILLUSTRATIVE_STATE } from "@/lib/scene/illustrative-state";
 import { DEFAULT_VIEW, type ViewSettings } from "@/lib/scene/view-settings";
 import type { TabKey } from "@/types/dashboard";
 import { CausalTimeline } from "./causal-timeline";
 import { DisruptionModal } from "./disruption-modal";
 import { FacilityPanel } from "./facility-panel";
+import { GuidedDemo } from "./guided-demo";
 import { InspectorPanel } from "./inspector-panel";
+import { RunNotice } from "./run-notice";
 import { SettingsPane } from "./settings-pane";
 import { TopBar, ViewMenu } from "./top-bar";
+
+/** Modal disruption ids -> run API bodies. Only the operator API injects. */
+const DISRUPTIONS: Readonly<Record<string, DisruptionBody>> = {
+  "H-1": { type: "dock_closure", targetId: "D-108" },
+  "H-2": { type: "equipment_failure", targetId: "F-07" },
+  "H-3": { type: "external_delay", targetId: "T-2291" },
+};
 
 export const DashboardLayout = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -30,27 +47,47 @@ export const DashboardLayout = () => {
     graphicsLost: false,
   });
 
-  // Authoritative simulation & agent integration
+  const [speed, setSpeed] = useState<1 | 4 | 16>(4);
+  const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
+
+  // The server-owned run: panels, timeline, inspector and scene all read it.
   const {
-    logicalTime,
-    stateVersion,
-    isPaused,
-    speed,
-    isDeliberating,
-    activeAgentId,
-    agents,
-    commitments,
-    timelineEvents,
-    counts,
-    lastDeliberation,
-    togglePause,
-    setSpeed,
-    setActiveAgentId,
-    nextStep,
-    injectDisruption,
-    triggerAgentDeliberation,
-    createCheckpoint,
-  } = useSimulation();
+    view: runView,
+    snapshot,
+    status,
+    busy,
+    canStep,
+    error,
+    start,
+    step,
+    disrupt,
+    refresh,
+  } = useRun();
+
+  // The illustrative state only when there is no run (plan B4).
+  const sceneState = useMemo(
+    () =>
+      snapshot ? sceneStateFromEngine(snapshot.engine) : ILLUSTRATIVE_STATE,
+    [snapshot],
+  );
+  const counts = runView?.counts ?? calculateDashboardCounts();
+  const closedDoors = useMemo(
+    () => doorIdsWithStatus(sceneState, "closed"),
+    [sceneState],
+  );
+  const reservedDoors = useMemo(
+    () => doorIdsWithStatus(sceneState, "reserved"),
+    [sceneState],
+  );
+
+  const guidedActions = useMemo<GuidedActions>(
+    () => ({
+      start: () => start("live"),
+      disrupt,
+      step,
+    }),
+    [start, disrupt, step],
+  );
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -73,29 +110,30 @@ export const DashboardLayout = () => {
 
   const handleInjectDisruption = useCallback(
     async (disruptionId: string) => {
+      const body = DISRUPTIONS[disruptionId];
+      if (!body) return;
+      const result = await disrupt(body);
       showToast(
-        `Injected ${disruptionId} disruption into authoritative engine`,
+        result.error
+          ? `Disruption ${disruptionId} not applied: ${result.error}`
+          : `Injected ${disruptionId} (${body.type} on ${body.targetId}) into the run`,
       );
-      await injectDisruption(disruptionId);
-
-      if (disruptionId === "H-1") {
-        handleSelectEntity("D-108");
-        setActiveAgentId("DOCK-C");
-        setActiveTab("agent");
-      } else if (disruptionId === "H-2") {
-        handleSelectEntity("F-07");
-        setActiveAgentId("SUP-1");
-        setActiveTab("agent");
-      }
+      if (!result.error) handleSelectEntity(body.targetId);
     },
-    [handleSelectEntity, injectDisruption, setActiveAgentId, showToast],
+    [disrupt, handleSelectEntity, showToast],
   );
+
+  const handleStep = useCallback(async () => {
+    const result = await step();
+    if (result.error) showToast(`Step failed: ${result.error}`);
+  }, [step, showToast]);
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-zinc-100 font-sans text-zinc-950 antialiased select-none dark:bg-zinc-950 dark:text-zinc-50">
       {/* The 3D scene fills the window; everything else floats over it. */}
       <section className="absolute inset-0">
         <SceneLoader
+          state={sceneState}
           selectedId={selectedId}
           onSelectEntity={handleSelectEntity}
           speed={speed}
@@ -126,22 +164,21 @@ export const DashboardLayout = () => {
       <div className="pointer-events-none absolute inset-x-3 top-3 bottom-16 z-20 flex flex-col gap-2">
         <div className="flex flex-wrap items-start gap-2">
           <TopBar
-            logicalTime={logicalTime}
-            isPaused={isPaused}
+            logicalTime={runView?.clock ?? null}
+            busy={busy}
+            canStep={canStep}
             speed={speed}
-            isDeliberating={isDeliberating}
-            onTogglePause={() => {
-              togglePause();
-              showToast(isPaused ? "Simulation resumed" : "Simulation paused");
-            }}
-            onNextEvent={async () => {
-              showToast("Advancing engine clock & stepping agent deliberation");
-              await nextStep();
-            }}
+            onStep={handleStep}
             onChangeSpeed={setSpeed}
             onOpenDisruptionModal={() => setDisruptionModalOpen(true)}
           />
-          <CausalTimeline events={timelineEvents} />
+          <GuidedDemo actions={guidedActions} busy={busy} />
+          <CausalTimeline
+            {...(runView
+              ? { events: runView.timeline, calls: snapshot?.modelCalls }
+              : {})}
+            fromRun={runView !== null}
+          />
           <ViewMenu
             facilityOpen={leftOpen}
             inspectorOpen={rightOpen}
@@ -149,7 +186,6 @@ export const DashboardLayout = () => {
             onToggleFacility={() => setLeftOpen((o) => !o)}
             onToggleInspector={() => setRightOpen((o) => !o)}
             onOpenEvidence={handleOpenEvidence}
-            onCheckpoint={() => showToast(createCheckpoint())}
             settings={
               <SettingsPane
                 view={view}
@@ -175,11 +211,22 @@ export const DashboardLayout = () => {
           />
         </div>
 
+        <RunNotice
+          status={status}
+          error={error}
+          busy={busy}
+          onStartNew={() => start("live")}
+          onRetry={refresh}
+        />
+
         <div className="relative min-h-0 flex-1">
           <FacilityPanel
             isOpen={leftOpen}
             counts={counts}
-            stateVersion={stateVersion}
+            fromRun={runView !== null}
+            stateVersion={snapshot?.stateVersion ?? null}
+            closedDoors={closedDoors}
+            reservedDoors={reservedDoors}
             onToggle={() => setLeftOpen((o) => !o)}
             onSelectEntity={handleSelectEntity}
             onOpenEvidence={handleOpenEvidence}
@@ -192,13 +239,10 @@ export const DashboardLayout = () => {
             onToggle={() => setRightOpen((o) => !o)}
             onSelectTab={setActiveTab}
             onSelectEntity={handleSelectEntity}
-            agents={agents}
+            view={runView}
+            sceneState={sceneState}
             activeAgentId={activeAgentId}
             onSelectAgent={setActiveAgentId}
-            onTriggerDeliberation={triggerAgentDeliberation}
-            isDeliberating={isDeliberating}
-            lastDeliberation={lastDeliberation}
-            commitments={commitments}
           />
         </div>
       </div>

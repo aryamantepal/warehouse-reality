@@ -1,14 +1,20 @@
 "use client";
 
 import { DEPENDENCIES, UNKNOWN_DFW_FIELDS } from "@/lib/dashboard/data";
+import type { RunCounts } from "@/lib/dashboard/project-run";
 import { S1 } from "@/lib/scene/facility";
-import type { DashboardCounts, ProvenanceKind } from "@/types/dashboard";
+import type { ProvenanceKind } from "@/types/dashboard";
 import { ProvenanceBadge } from "./provenance-badge";
 
 interface FacilityPanelProps {
   isOpen: boolean;
-  counts: DashboardCounts;
-  stateVersion: number;
+  /** Engine counts, or the illustrative preview's before any run. */
+  counts: RunCounts;
+  /** True when counts and doors come from a server run's engine snapshot. */
+  fromRun: boolean;
+  stateVersion: number | null;
+  closedDoors: readonly string[];
+  reservedDoors: readonly string[];
   onToggle: () => void;
   onSelectEntity: (id: string) => void;
   onOpenEvidence: () => void;
@@ -28,14 +34,15 @@ const LEGEND: readonly {
 
 /** Engine banner, profile, workload and provenance legend; moved here from the old top bar and banner. */
 interface RunContextProps {
-  stateVersion: number;
+  stateVersion: number | null;
 }
 
 const RunContext = ({ stateVersion }: RunContextProps) => (
   <div className="space-y-1.5 text-zinc-700 dark:text-zinc-300">
     <p className="rounded-md border border-dashed border-amber-500/60 bg-amber-50/50 px-2 py-1 text-[11px] text-amber-900 dark:bg-amber-950/20 dark:text-amber-300">
-      Live Simulation State: engine v{stateVersion} · DFW S1 physical invariants
-      enforced.
+      {stateVersion === null
+        ? "No run yet: illustrative preview only. The layout is schematic until a site plan is traced."
+        : `Run state: engine v${stateVersion} · S1 physical invariants enforced. Layout is schematic.`}
     </p>
     <div className="flex items-center justify-between">
       <span>Profile</span>
@@ -49,10 +56,6 @@ const RunContext = ({ stateVersion }: RunContextProps) => (
         Demo Day v2 <ProvenanceBadge kind="drv">vol derived</ProvenanceBadge>
       </span>
     </div>
-    <div className="flex items-center justify-between">
-      <span>Run mode</span>
-      <span className="font-medium">Distributed agents · FCFS fallback</span>
-    </div>
     <ul className="flex flex-wrap gap-x-2 gap-y-1 pt-1 text-[11px]">
       {LEGEND.map(({ kind, badge, meaning }) => (
         <li key={kind} className="flex items-center gap-1">
@@ -64,10 +67,40 @@ const RunContext = ({ stateVersion }: RunContextProps) => (
   </div>
 );
 
+interface DoorLinksProps {
+  ids: readonly string[];
+  tone: string;
+  onSelectEntity: (id: string) => void;
+}
+
+const MAX_LINKS = 4;
+
+const DoorLinks = ({ ids, tone, onSelectEntity }: DoorLinksProps) =>
+  ids.length === 0 ? (
+    <span className="text-zinc-400">none</span>
+  ) : (
+    <>
+      {ids.slice(0, MAX_LINKS).map((id) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onSelectEntity(id)}
+          className={`font-mono underline ${tone}`}
+        >
+          {id}
+        </button>
+      ))}
+      {ids.length > MAX_LINKS && <span>+{ids.length - MAX_LINKS}</span>}
+    </>
+  );
+
 export const FacilityPanel = ({
   isOpen,
   counts,
+  fromRun,
   stateVersion,
+  closedDoors,
+  reservedDoors,
   onToggle,
   onSelectEntity,
   onOpenEvidence,
@@ -184,7 +217,11 @@ export const FacilityPanel = ({
               </span>
               Live Occupancy
             </span>
-            <ProvenanceBadge kind="ill">illus→sim</ProvenanceBadge>
+            {fromRun ? (
+              <ProvenanceBadge kind="drv">engine</ProvenanceBadge>
+            ) : (
+              <ProvenanceBadge kind="ill">illustrative</ProvenanceBadge>
+            )}
           </summary>
           <div className="space-y-1 text-zinc-700 dark:text-zinc-300">
             <div className="flex justify-between">
@@ -201,22 +238,18 @@ export const FacilityPanel = ({
             </div>
             <div className="flex justify-between">
               <span>Closed · reserved</span>
-              <span className="font-mono">
-                <button
-                  type="button"
-                  onClick={() => onSelectEntity("D-108")}
-                  className="text-amber-600 dark:text-amber-400 underline font-mono"
-                >
-                  D-108
-                </button>{" "}
-                ·{" "}
-                <button
-                  type="button"
-                  onClick={() => onSelectEntity("D-112")}
-                  className="text-blue-600 dark:text-blue-400 underline font-mono"
-                >
-                  D-112
-                </button>
+              <span className="flex flex-wrap justify-end gap-x-1 font-mono">
+                <DoorLinks
+                  ids={closedDoors}
+                  tone="text-amber-600 dark:text-amber-400"
+                  onSelectEntity={onSelectEntity}
+                />
+                <span>·</span>
+                <DoorLinks
+                  ids={reservedDoors}
+                  tone="text-blue-600 dark:text-blue-400"
+                  onSelectEntity={onSelectEntity}
+                />
               </span>
             </div>
             <div className="flex justify-between">
@@ -244,7 +277,11 @@ export const FacilityPanel = ({
               </span>
               Queues & Dependencies
             </span>
-            <ProvenanceBadge kind="ill">illus→sim</ProvenanceBadge>
+            {fromRun ? (
+              <ProvenanceBadge kind="drv">engine</ProvenanceBadge>
+            ) : (
+              <ProvenanceBadge kind="ill">illustrative</ProvenanceBadge>
+            )}
           </summary>
           <div className="space-y-1 text-zinc-700 dark:text-zinc-300">
             <div className="flex justify-between">
@@ -257,23 +294,34 @@ export const FacilityPanel = ({
             </div>
             <div className="flex justify-between font-medium text-amber-700 dark:text-amber-400">
               <span>Outbound blocked freight</span>
-              <span className="font-mono">{counts.outboundBlocked}</span>
+              {counts.outboundBlocked === null ? (
+                <ProvenanceBadge kind="unk">unknown</ProvenanceBadge>
+              ) : (
+                <span className="font-mono">{counts.outboundBlocked}</span>
+              )}
             </div>
 
-            <ul className="space-y-1 border-l-2 border-amber-400/50 pl-2 text-[11px] text-zinc-600 dark:text-zinc-400">
-              {DEPENDENCIES.map((dep) => (
-                <li key={dep.door} className="leading-snug">
-                  <button
-                    type="button"
-                    onClick={() => onSelectEntity(dep.door)}
-                    className="font-mono text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {dep.door}
-                  </button>{" "}
-                  needs {dep.shipment} · {dep.reason}
-                </li>
-              ))}
-            </ul>
+            {fromRun ? (
+              <p className="text-[10px] leading-tight text-zinc-500">
+                The engine does not model outbound freight dependencies, so none
+                are shown.
+              </p>
+            ) : (
+              <ul className="space-y-1 border-l-2 border-amber-400/50 pl-2 text-[11px] text-zinc-600 dark:text-zinc-400">
+                {DEPENDENCIES.map((dep) => (
+                  <li key={dep.door} className="leading-snug">
+                    <button
+                      type="button"
+                      onClick={() => onSelectEntity(dep.door)}
+                      className="font-mono text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {dep.door}
+                    </button>{" "}
+                    needs {dep.shipment} · {dep.reason}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </details>
 
