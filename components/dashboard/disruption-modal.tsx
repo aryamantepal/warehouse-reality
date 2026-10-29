@@ -1,20 +1,58 @@
 "use client";
 
+import { useState } from "react";
 import { TextureButton } from "@/components/ui/texture-button";
+import {
+  type ExternalSearchResult,
+  externalSearchResultSchema,
+  toDisruptionBody,
+} from "@/lib/external/disruption-types";
+import type { DisruptionBody } from "@/lib/run/api-schemas";
 import { ProvenanceBadge } from "./provenance-badge";
 
 interface DisruptionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onInject: (disruptionId: string) => void;
+  /** Injects a search-derived hypothetical through the run API. */
+  onInjectExternal: (body: DisruptionBody, label: string) => void;
 }
+
+type SearchState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "done"; result: ExternalSearchResult };
+
+const searchExternal = async (): Promise<SearchState> => {
+  try {
+    const res = await fetch("/api/external/search", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    const parsed = externalSearchResultSchema.safeParse(await res.json());
+    return parsed.success
+      ? { status: "done", result: parsed.data }
+      : { status: "error", message: "Unexpected search response." };
+  } catch {
+    return { status: "error", message: "Search request failed." };
+  }
+};
 
 export const DisruptionModal = ({
   isOpen,
   onClose,
   onInject,
+  onInjectExternal,
 }: DisruptionModalProps) => {
+  const [search, setSearch] = useState<SearchState>({ status: "idle" });
   if (!isOpen) return null;
+
+  const runSearch = async () => {
+    setSearch({ status: "loading" });
+    setSearch(await searchExternal());
+  };
 
   return (
     <div
@@ -116,6 +154,78 @@ export const DisruptionModal = ({
             >
               Apply H-3 Disruption
             </TextureButton>
+          </div>
+
+          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2.5 dark:border-zinc-800 dark:bg-zinc-950/40 text-xs space-y-2">
+            <div className="flex justify-between items-baseline">
+              <span className="font-semibold">News scout (Tavily)</span>
+              <ProvenanceBadge kind="hyp">hypothetical</ProvenanceBadge>
+            </div>
+            <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+              A news hit proposes a disruption. It is not proof the facility was
+              affected, and closure or delay lengths stay unknown.
+            </p>
+            <TextureButton
+              variant="minimal"
+              size="sm"
+              onClick={runSearch}
+              disabled={search.status === "loading"}
+            >
+              {search.status === "loading" ? "Searching..." : "Search news"}
+            </TextureButton>
+            {search.status === "error" && (
+              <p className="text-[11px] text-red-700 dark:text-red-400">
+                {search.message}
+              </p>
+            )}
+            {search.status === "done" && (
+              <div className="space-y-1.5">
+                {search.result.source === "illustrative" ? (
+                  <p className="text-[11px] font-semibold text-sky-700 dark:text-sky-300">
+                    Illustrative examples, not a live search.{" "}
+                    {search.result.fallbackReason}
+                  </p>
+                ) : (
+                  <p className="text-[11px] font-semibold text-teal-700 dark:text-teal-300">
+                    Live search results (external_search)
+                  </p>
+                )}
+                {search.result.disruptions.map((item) => (
+                  <div
+                    key={item.id}
+                    className="space-y-1 rounded border border-zinc-200 p-2 dark:border-zinc-800"
+                  >
+                    <div className="font-medium">{item.title}</div>
+                    <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                      {item.suggestedAction.impactHypothesis}
+                    </p>
+                    {item.url && (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block truncate text-[11px] text-blue-700 underline dark:text-blue-300"
+                      >
+                        {item.url}
+                      </a>
+                    )}
+                    <TextureButton
+                      variant="minimal"
+                      size="sm"
+                      onClick={() => {
+                        onInjectExternal(
+                          toDisruptionBody(search.result.source, item),
+                          item.title,
+                        );
+                        onClose();
+                      }}
+                    >
+                      Inject as hypothetical
+                    </TextureButton>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

@@ -156,6 +156,19 @@ export const DashboardLayout = () => {
     [trackedDisrupt, handleSelectEntity, showToast],
   );
 
+  const handleInjectExternal = useCallback(
+    async (body: DisruptionBody, label: string) => {
+      const result = await trackedDisrupt(body);
+      showToast(
+        result.error
+          ? `Hypothetical not applied: ${result.error}`
+          : `Injected hypothetical "${label}" (${body.type} on ${body.targetId})`,
+      );
+      if (!result.error) handleSelectEntity(body.targetId);
+    },
+    [trackedDisrupt, handleSelectEntity, showToast],
+  );
+
   const handleStep = useCallback(async () => {
     const result = await step();
     if (result.error) showToast(`Step failed: ${result.error}`);
@@ -191,6 +204,7 @@ export const DashboardLayout = () => {
         isOpen={disruptionModalOpen}
         onClose={() => setDisruptionModalOpen(false)}
         onInject={handleInjectDisruption}
+        onInjectExternal={handleInjectExternal}
       />
 
       {/* Drawers sit below the top row at whatever height it wraps or expands to. */}

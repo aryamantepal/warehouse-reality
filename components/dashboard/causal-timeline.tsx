@@ -134,6 +134,25 @@ export const CausalTimeline = ({
                   <div className="max-w-44 truncate" title={evt.title}>
                     {evt.title}
                   </div>
+                  {evt.sources?.length ? (
+                    <div className="flex flex-col gap-0.5">
+                      <ProvenanceBadge kind="hyp">
+                        hypothetical · {evt.provenance}
+                      </ProvenanceBadge>
+                      {evt.sources.map((src) => (
+                        <a
+                          key={src.url}
+                          href={src.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={src.url}
+                          className="max-w-44 truncate text-[10px] underline"
+                        >
+                          {src.title}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
                   {evt.reasonCode && (
                     <div className="font-mono text-[10px] font-semibold text-red-700 dark:text-red-400">
                       {evt.reasonCode}
