@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SceneStatus } from "@/components/scene/facility-scene";
 import { SceneLoader } from "@/components/scene/scene-loader";
+import { TextureButton } from "@/components/ui/texture-button";
 import {
   calculateDashboardCounts,
   doorIdsWithStatus,
@@ -20,6 +21,7 @@ import { DisruptionModal } from "./disruption-modal";
 import { FacilityPanel } from "./facility-panel";
 import { GuidedDemo } from "./guided-demo";
 import { InspectorPanel } from "./inspector-panel";
+import { ReplayBanner } from "./replay-banner";
 import { RunNotice } from "./run-notice";
 import { SettingsPane } from "./settings-pane";
 import { TopBar, ViewMenu } from "./top-bar";
@@ -62,7 +64,16 @@ export const DashboardLayout = () => {
     step,
     disrupt,
     refresh,
+    replayRecorded,
+    recording,
   } = useRun();
+
+  // ?replay=d108 opens the recorded run directly: the hosted-demo entry point.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("replay") === "d108") {
+      void replayRecorded();
+    }
+  }, [replayRecorded]);
 
   // The illustrative state only when there is no run (plan B4).
   const sceneState = useMemo(
@@ -173,6 +184,15 @@ export const DashboardLayout = () => {
             onOpenDisruptionModal={() => setDisruptionModalOpen(true)}
           />
           <GuidedDemo actions={guidedActions} busy={busy} />
+          <TextureButton
+            variant="minimal"
+            size="sm"
+            className="pointer-events-auto w-auto"
+            disabled={busy}
+            onClick={() => void replayRecorded()}
+          >
+            Watch recorded run
+          </TextureButton>
           <CausalTimeline
             {...(runView
               ? { events: runView.timeline, calls: snapshot?.modelCalls }
@@ -217,7 +237,9 @@ export const DashboardLayout = () => {
           busy={busy}
           onStartNew={() => start("live")}
           onRetry={refresh}
+          onWatchRecording={() => void replayRecorded()}
         />
+        {recording && <ReplayBanner recording={recording} />}
 
         <div className="relative min-h-0 flex-1">
           <FacilityPanel
