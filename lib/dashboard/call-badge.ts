@@ -7,7 +7,12 @@
 import type { ModelCall, Provenance, RunBudget } from "@/types/run";
 import type { RunTimelineEvent } from "./project-run";
 
-export type CallSource = "nemotron" | "fallback" | "baseline" | "other";
+export type CallSource =
+  | "nemotron"
+  | "test_model"
+  | "fallback"
+  | "baseline"
+  | "other";
 
 export interface CallBadgeView {
   source: CallSource;
@@ -43,6 +48,9 @@ export const callSource = (
 ): CallSource => {
   if (provenance === "baseline") return "baseline";
   if (call.isFallback || provenance === "fallback") return "fallback";
+  if (call.provider === "anthropic" || provenance === "test_model") {
+    return "test_model";
+  }
   return provenance === "nemotron" ? "nemotron" : "other";
 };
 
@@ -53,7 +61,12 @@ export const callBadgeOf = (
   const source = callSource(call, provenance);
   return {
     source,
-    label: source === "other" ? (provenance ?? "unlabelled") : source,
+    label:
+      source === "other"
+        ? (provenance ?? "unlabelled")
+        : source === "test_model"
+          ? "CLAUDE (TEST)"
+          : source,
     model: call.model,
     tier: call.tier,
     latency: formatLatency(call.latencyMs),

@@ -51,6 +51,7 @@ export interface DashboardView {
   /** Model calls by provenance; `other` (e.g. replay) keeps the sum equal to the call count. */
   provenanceSummary: {
     nemotron: number;
+    testModel: number;
     fallback: number;
     baseline: number;
     other: number;
@@ -234,7 +235,7 @@ const projectEvent = (
     title,
     type: timelineType(e, call),
     ...(tag ? { tag } : {}),
-    isLLM: isTurn && provenance === "nemotron",
+    isLLM: isTurn && (provenance === "nemotron" || provenance === "test_model"),
     provenance,
     ...(reasonCode ? { reasonCode } : {}),
     ...(isTurn ? { modelCallId: call.id } : {}),
@@ -246,11 +247,21 @@ const summarize = (
   calls: readonly ModelCall[],
   eventByCall: ReadonlyMap<string, Provenance>,
 ): DashboardView["provenanceSummary"] => {
-  const summary = { nemotron: 0, fallback: 0, baseline: 0, other: 0 };
+  const summary = {
+    nemotron: 0,
+    testModel: 0,
+    fallback: 0,
+    baseline: 0,
+    other: 0,
+  };
   for (const c of calls) {
     const p = callProvenance(c, eventByCall.get(c.id));
     const bucket =
-      p === "nemotron" || p === "fallback" || p === "baseline" ? p : "other";
+      p === "test_model"
+        ? "testModel"
+        : p === "nemotron" || p === "fallback" || p === "baseline"
+          ? p
+          : "other";
     summary[bucket] += 1;
   }
   return summary;

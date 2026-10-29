@@ -96,7 +96,7 @@ export const ComparePanel = ({
                 <thead>
                   <tr>
                     <th scope="col">Metric</th>
-                    <th scope="col">Agents</th>
+                    <th scope="col">{comparison.agentsLabel}</th>
                     <th scope="col">First-come</th>
                   </tr>
                 </thead>

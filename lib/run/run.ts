@@ -6,6 +6,7 @@
 import type {
   Deliberator,
   ModelCall,
+  ModelProvider,
   ModelTier,
   Provenance,
   RunBudget,
@@ -40,10 +41,13 @@ const provenanceOf = (
   kind: Deliberator["kind"],
   isFallback: boolean,
   exhausted: boolean,
+  provider?: ModelProvider,
 ): Provenance => {
   if (exhausted || kind === "baseline") return "baseline";
   if (isFallback) return "fallback";
-  return kind === "nemotron" ? "nemotron" : "replay";
+  if (kind !== "nemotron") return "replay";
+  // A Claude call is never labelled nemotron.
+  return provider === "anthropic" ? "test_model" : "nemotron";
 };
 
 export class Run {
@@ -223,7 +227,12 @@ export class Run {
       proposers: this.proposers,
     });
     const isFallback = decision.call.isFallback || exhausted;
-    const provenance = provenanceOf(deliberator.kind, isFallback, exhausted);
+    const provenance = provenanceOf(
+      deliberator.kind,
+      isFallback,
+      exhausted,
+      decision.call.provider,
+    );
     const call: ModelCall = {
       ...decision.call,
       id: `MC-${this.modelCalls.length + 1}`,

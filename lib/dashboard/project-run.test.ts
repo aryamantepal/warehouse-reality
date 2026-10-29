@@ -156,6 +156,7 @@ describe("projectRun", () => {
       );
       expect(view.provenanceSummary).toEqual({
         nemotron: 0,
+        testModel: 0,
         fallback: snap.modelCalls.length,
         baseline: 0,
         other: 0,

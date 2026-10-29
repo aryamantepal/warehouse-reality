@@ -8,17 +8,24 @@
  *
  * With no key on the server every turn is a labeled fallback; the script says
  * so and writes public/runs/d108-fallback.json instead of d108-nebius.json.
+ * With only ANTHROPIC_API_KEY set, turns are answered by a Claude TEST model:
+ * the script writes public/runs/d108-test-model.json with a loud warning.
+ * Only real Nemotron turns may produce d108-nebius.json.
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
-import { RecordedRunSchema } from "../lib/run/recording-schema.ts";
+import {
+  isTestRecording,
+  RecordedRunSchema,
+} from "../lib/run/recording-schema.ts";
 
 const MAX_STEP_ROUNDS = 40;
 const STEP_TURNS = 4;
 const REQUEST_TIMEOUT_MS = 5 * 60_000;
 const NEBIUS_OUT = "public/runs/d108-nebius.json";
+const TEST_OUT = "public/runs/d108-test-model.json";
 const FALLBACK_OUT = "public/runs/d108-fallback.json";
 
 const { values } = parseArgs({
@@ -90,8 +97,14 @@ const main = async (): Promise<void> => {
     await call("GET", `/api/runs/${runId}/export`),
   );
   const fallbacks = recording.modelCalls.filter((c) => c.isFallback).length;
+  const testModel = isTestRecording(recording);
   const out =
-    values.out ?? (recording.hasModelTurns ? NEBIUS_OUT : FALLBACK_OUT);
+    values.out ??
+    (testModel
+      ? TEST_OUT
+      : recording.hasModelTurns
+        ? NEBIUS_OUT
+        : FALLBACK_OUT);
 
   await mkdir(dirname(out), { recursive: true });
   await writeFile(out, `${JSON.stringify(recording, null, 2)}\n`);
@@ -101,7 +114,15 @@ const main = async (): Promise<void> => {
   );
   console.log(`models: ${recording.models.join(", ") || "none"}`);
 
-  if (!recording.hasModelTurns) {
+  if (testModel) {
+    console.warn(
+      "\n############################################################\n" +
+        "WARNING: this is NOT a Nemotron recording. Turns were answered by a\n" +
+        `Claude TEST model (${recording.models.join(", ")}) via ANTHROPIC_API_KEY.\n` +
+        "Never present it as Nebius Token Factory / NVIDIA output.\n" +
+        "############################################################",
+    );
+  } else if (!recording.hasModelTurns) {
     console.warn(
       "\nWARNING: this is NOT a Nemotron recording. No turn was answered by a " +
         "model (NEBIUS_API_KEY missing on the server, or every call fell " +

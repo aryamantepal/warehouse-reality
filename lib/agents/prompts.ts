@@ -51,7 +51,7 @@ NON-NEGOTIABLE OPERATIONAL INVARIANTS:
 OUTPUT FORMAT:
 Always respond with a valid JSON object with the following structure:
 {
-  "thought": "Your internal deliberation and step-by-step reasoning based on local observations and goals",
+  "thought": "Your internal deliberation and step-by-step reasoning based on local observations and goals. Keep it under 80 words so the reply is not cut off",
   "toolCall": {
     "tool": "propose" | "accept" | "commit" | "executeMove" | "executeUnload" | "cancel" | "escalate",
     "parameters": { ... }

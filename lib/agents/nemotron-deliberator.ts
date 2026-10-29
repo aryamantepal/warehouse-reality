@@ -12,8 +12,8 @@ import type {
   TurnDecision,
   TurnInput,
 } from "../../types/run";
-import { requestChatCompletion } from "./chat-completion";
-import { modelFor } from "./models";
+import { requestChatCompletion, selectProvider } from "./chat-completion";
+import { anthropicTestModel, modelFor } from "./models";
 import { fallbackLocalDeliberation } from "./nebius-client";
 import { buildDeliberationPrompt } from "./prompts";
 import { AgentToolCallSchema } from "./schemas";
@@ -34,10 +34,40 @@ type Parsed =
   | { ok: true; thought: string; toolCall?: AgentToolCall }
   | { ok: false };
 
+/** First balanced top-level {...} object in the text, or null. */
+const firstJsonObject = (text: string): string | null => {
+  const start = text.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+    } else if (ch === '"') inString = true;
+    else if (ch === "{") depth += 1;
+    else if (ch === "}" && --depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+};
+
+const parseJson = (content: string): unknown => {
+  try {
+    return JSON.parse(stripFence(content));
+  } catch {
+    const extracted = firstJsonObject(content);
+    if (extracted === null) throw new Error("no json");
+    return JSON.parse(extracted);
+  }
+};
+
 const parseReply = (content: string): Parsed => {
   let raw: unknown;
   try {
-    raw = JSON.parse(stripFence(content));
+    raw = parseJson(content);
   } catch {
     return { ok: false };
   }
@@ -65,7 +95,12 @@ export const createNemotronDeliberator = (
   kind: "nemotron",
   async decide(input: TurnInput): Promise<TurnDecision> {
     const env = opts.env ?? process.env;
-    const model = modelFor(input.tier, env);
+    const provider = selectProvider(env);
+    // TEST ONLY: with no Nebius key, a Claude model answers every tier.
+    const model =
+      provider === "anthropic"
+        ? anthropicTestModel(env)
+        : modelFor(input.tier, env);
     const { agent } = input;
     const prompt = buildDeliberationPrompt(
       agent.role,
@@ -86,6 +121,7 @@ export const createNemotronDeliberator = (
       role: agent.role,
       tier: input.tier,
       model,
+      provider,
       latencyMs: result.latencyMs,
       logicalTime: input.logicalTime,
       stateVersion: input.stateVersion,
