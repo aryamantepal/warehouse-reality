@@ -3,7 +3,7 @@
  * Pure TypeScript; no rendering dependencies.
  */
 
-import type { EntityId, ToolResult } from "../engine/types";
+import type { EntityId } from "../engine/types";
 
 export type AgentRole =
   | "driver"
