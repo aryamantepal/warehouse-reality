@@ -25,6 +25,8 @@ export interface CompareProvenance {
 
 export interface Comparison {
   rows: CompareRow[];
+  /** Header for the agent column; says so when a Claude test model answered. */
+  agentsLabel: string;
   agentsModels: string;
   baselineModels: string;
   provenance: CompareProvenance;
@@ -48,6 +50,12 @@ const ROWS: {
   { key: "tokens", label: "Tokens", unit: "" },
 ];
 
+const TEST_NOTE = "The agent column is a Claude test model, not Nemotron. ";
+
+/** True when a Claude test model answered at least one agent call. */
+export const usedTestModel = (snapshot: RunSnapshot): boolean =>
+  snapshot.modelCalls.some((c) => !c.isFallback && c.provider === "anthropic");
+
 /** Distinct model ids that genuinely answered a call (fallbacks excluded). */
 export const answeringModels = (snapshot: RunSnapshot): string[] => [
   ...new Set(
@@ -60,6 +68,7 @@ const provenanceOf = (
   baseline: RunSnapshot,
   agentMetrics: RunMetrics,
 ): CompareProvenance => {
+  const note = usedTestModel(agents) ? TEST_NOTE : "";
   if (agentMetrics.modelCalls === 0) {
     return {
       kind: "all_baseline",
@@ -73,15 +82,15 @@ const provenanceOf = (
     return {
       kind: "partly_baseline",
       title: "Partly baseline",
-      detail:
-        "Some agent turns fell back to first-come rules or a run hit its call or token cap.",
+      detail: `${note}Some agent turns fell back to first-come rules or a run hit its call or token cap.`,
     };
   }
   return {
     kind: "model",
-    title: "Agents (Nemotron) vs first-come rules",
-    detail:
-      "Identical scenario and disruptions. Numbers are measured from each run; no column is declared better.",
+    title: note
+      ? "Agents (Claude TEST model, not Nemotron) vs first-come rules"
+      : "Agents (Nemotron) vs first-come rules",
+    detail: `${note}Identical scenario and disruptions. Numbers are measured from each run; no column is declared better.`,
   };
 };
 
@@ -99,6 +108,7 @@ export const buildComparison = (
       agents: fmt(a[key], unit),
       baseline: fmt(b[key], unit),
     })),
+    agentsLabel: usedTestModel(agents) ? "Agents (Claude test)" : "Agents",
     agentsModels: models.length > 0 ? models.join(", ") : "none answered",
     baselineModels: "none (first-come rules)",
     provenance: provenanceOf(agents, baseline, a),

@@ -34,6 +34,7 @@ const CallBase = z.object({
   role: Role,
   tier: Tier,
   model: z.string().min(1),
+  provider: z.enum(["nebius", "anthropic"]).optional(),
   isFallback: z.boolean(),
   fallbackReason: Reason.optional(),
   latencyMs: z.number().nonnegative(),
@@ -82,6 +83,7 @@ const EventSchema = z.object({
   provenance: z.enum([
     "engine",
     "nemotron",
+    "test_model",
     "fallback",
     "baseline",
     "operator",
@@ -108,3 +110,8 @@ export const RecordedRunSchema = z.object({
   finalEngine: z.record(z.string(), z.unknown()),
 });
 export type RecordedRun = z.infer<typeof RecordedRunSchema>;
+
+/** True when any call was answered by the Claude test provider (never Nemotron). */
+export const isTestRecording = (r: RecordedRun): boolean =>
+  r.modelCalls.some((c) => !c.isFallback && c.provider === "anthropic") ||
+  r.events.some((e) => e.provenance === "test_model");

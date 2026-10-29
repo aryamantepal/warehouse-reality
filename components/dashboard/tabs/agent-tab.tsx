@@ -115,8 +115,8 @@ export const AgentTab = ({
         </div>
         <BudgetMeter budget={view.budget} />
         <p className="font-mono text-[10px] text-zinc-500">
-          Turns: {s.nemotron} nemotron · {s.fallback} fallback · {s.baseline}{" "}
-          baseline
+          Turns: {s.nemotron} nemotron · {s.testModel} claude (test) ·{" "}
+          {s.fallback} fallback · {s.baseline} baseline
           {s.other > 0 ? ` · ${s.other} other` : ""}
         </p>
       </section>

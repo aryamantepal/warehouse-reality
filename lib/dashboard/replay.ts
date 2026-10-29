@@ -9,13 +9,15 @@ import {
   RecordedRunSchema,
   replayRun,
 } from "@/lib/run/recording";
+import { isTestRecording } from "@/lib/run/recording-schema";
 import type { RunSnapshot } from "@/types/run";
 import type { FetchFn, RunResponse } from "./run-client";
 
-/** Preferred first: a genuine Nebius recording, then the labeled fallback one. */
+/** Preferred first: a genuine Nebius recording, the labeled fallback one, then the Claude test one. */
 export const RECORDING_URLS: readonly string[] = [
   "/runs/d108-nebius.json",
   "/runs/d108-fallback.json",
+  "/runs/d108-test-model.json",
 ];
 
 export const NO_RECORDING = "NO_RECORDING";
@@ -58,7 +60,7 @@ export const loadRecording = async (
 
 export interface ReplayLabel {
   /** "model" only when at least one turn was genuinely answered by a model. */
-  kind: "model" | "fallback";
+  kind: "model" | "test_model" | "fallback";
   title: string;
   detail: string;
 }
@@ -69,6 +71,13 @@ const formatDate = (iso: string): string =>
 /** Banner wording. A recording with no model turns is never called Nemotron. */
 export const replayLabel = (r: RecordedRun): ReplayLabel => {
   const when = formatDate(r.recordedAt);
+  if (isTestRecording(r)) {
+    return {
+      kind: "test_model",
+      title: "Test recording (Claude), not Nemotron",
+      detail: `Answered by ${r.models.join(", ")}, a test model; not Nebius Token Factory output. Recorded ${when}. Replay makes no model calls.`,
+    };
+  }
   if (r.hasModelTurns) {
     return {
       kind: "model",

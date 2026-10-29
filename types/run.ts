@@ -19,6 +19,7 @@ export type ModelTier = "nano" | "super" | "ultra";
 export type Provenance =
   | "engine"
   | "nemotron"
+  | "test_model"
   | "fallback"
   | "baseline"
   | "operator"
@@ -32,12 +33,17 @@ export type FallbackReason =
   | "malformed_tool_call"
   | "budget_exhausted";
 
+/** Which API answered. "anthropic" is a test model and is never Nemotron. */
+export type ModelProvider = "nebius" | "anthropic";
+
 export interface ModelCall {
   id: string;
   agentId: string;
   role: AgentRole;
   tier: ModelTier;
   model: string;
+  /** Absent on older recordings; treated as nebius. */
+  provider?: ModelProvider;
   isFallback: boolean;
   fallbackReason?: FallbackReason;
   latencyMs: number;

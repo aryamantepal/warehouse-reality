@@ -10,6 +10,13 @@ import type { AgentRole } from "./types";
 export const NEBIUS_DEFAULT_BASE_URL =
   "https://api.tokenfactory.us-central1.nebius.com/v1";
 
+export const ANTHROPIC_TEST_DEFAULT_MODEL = "claude-haiku-5-5";
+
+/** TEST-ONLY Claude model, used for every tier when no Nebius key is set. */
+export const anthropicTestModel = (
+  env: NodeJS.ProcessEnv = process.env,
+): string => env.ANTHROPIC_TEST_MODEL?.trim() || ANTHROPIC_TEST_DEFAULT_MODEL;
+
 export const MODEL_TIERS: readonly ModelTier[] = ["nano", "super", "ultra"];
 
 // Plan Global Constraints defaults; the smoke test checks each against `GET /models`.

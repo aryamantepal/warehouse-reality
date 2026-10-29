@@ -8,6 +8,8 @@ import type { RunBudget } from "@/types/run";
 const SOURCE_STYLES: Record<CallSource, string> = {
   nemotron:
     "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-300",
+  test_model:
+    "border border-violet-500 bg-violet-100 text-violet-800 dark:bg-violet-400/15 dark:text-violet-300",
   fallback: "bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-300",
   baseline: "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200",
   other:
