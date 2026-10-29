@@ -24,7 +24,7 @@ Before recording
 
 If over time, cut the facility shot to 10 seconds and the replay shot to 10 seconds.
 
-Do not show or say: any latency, token or improvement number you did not read off the recording; "ShiftWorld"; claims that this matches real Amazon operations; Tavily, unless the Tavily scout exists in the build you record.
+Do not show or say: any latency, token or improvement number you did not read off the recording; "ShiftWorld"; claims that this matches real Amazon operations; an Illustrative Tavily example presented as a live search result.
 
 ## Checklist after upload
 - [ ] Video is public, 3:00 or shorter, and at least one minute shows the product working.

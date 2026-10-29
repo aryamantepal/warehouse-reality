@@ -44,8 +44,8 @@ Nothing shown as model output is unlabeled.
 | `NEMOTRON` | A real Token Factory reply that passed validation. Shows model id, tier, latency and tokens ("unknown" if the provider reported no usage). |
 | `FALLBACK` | The model call failed (`no_api_key`, `http_error`, `timeout`, `malformed_tool_call`, `budget_exhausted`) and deterministic local rules stood in. Never displayed as Nemotron. |
 | `BASELINE` | A first-come-first-served turn: the comparison run, or turns after the budget cap. No model is called. |
-| `external_search` | A disruption that carries source URLs from an outside search. The run API accepts `sources` on a disruption and tags the event this way. The Tavily search client itself is not on this branch (see Known gaps). |
-| `CLAUDE (TEST)` | Reserved for turns answered by a Claude test stand-in. Not implemented in the code at this commit, so no such label is rendered. `<TODO: confirm with the team whether this ships>` |
+| `external_search` | A disruption that carries source URLs from an outside search. The run API accepts `sources` on a disruption and tags the event this way. The disruption modal's "News scout (Tavily)" searches via `POST /api/external/search` (server-side key) and injects a chosen result as a hypothetical with its URL. With no key or no match it shows `[Illustrative]` examples, which are injected as plain operator disruptions, never as `external_search`. |
+| `CLAUDE (TEST)` | Test-only: when `NEBIUS_API_KEY` is blank and `ANTHROPIC_API_KEY` is set, live turns go to Claude (`ANTHROPIC_TEST_MODEL`, default `claude-haiku-5-5`) with provenance `test_model`. Never shown, recorded or exported as Nemotron; recordings go to `public/runs/d108-test-model.json`. Not for the submission. |
 
 Other event labels are `engine`, `operator` (a human-injected hypothetical), and `replay`. The facility panel also uses `src`, `drv`, `hyp`, `unk` and `ill` badges for sourced, derived, hypothetical, unknown and illustrative values.
 
@@ -119,7 +119,6 @@ Read [the architecture](docs/architecture.md), [submission checklist and demo pl
 ## Known gaps
 
 - No Nebius recording is committed yet, and no live inference has been verified from this repository.
-- The Tavily search client (`lib/external`) is not on this branch; the `external_search` label exists only on the disruption API path.
 - The facility layout is schematic until a site plan is traced, and the UI says so.
 - `docs/architecture.md` is dated October 26 and partly predates the server-owned run; where they differ, the code wins.
 

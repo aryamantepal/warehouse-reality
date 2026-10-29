@@ -59,15 +59,15 @@ Scenario values (trailers, shipment, the D-108 and D-112 doors) are rehearsal in
 - Replace scenario values with an evidence-recorded workload (source, unit, date, classification, interpretation for every number).
 - More roles and more disruption types (equipment failure exists in the engine).
 - Branch from checkpoints and export run evidence.
-- Live external-disruption search with sources attached to hypotheticals (the `external_search` label exists; the search client is not in the current build). `[TODO: update if Tavily ships]`
+- Broader mapping of live news into hypotheticals (today only weather → D-108 closure and highway → DRV-047 delay, with durations left unknown).
 
 ## Built with
 
-NVIDIA Nemotron (Nano, Super, Ultra tiers), Nebius Token Factory, Next.js 16, React 19, TypeScript, Zod, React Three Fiber, Tailwind CSS 4, Vitest, Biome, Docker. `[TODO: add Tavily only if it ships]`
+NVIDIA Nemotron (Nano, Super, Ultra tiers), Nebius Token Factory, Next.js 16, React 19, TypeScript, Zod, React Three Fiber, Tailwind CSS 4, Vitest, Biome, Docker, Tavily.
 
 ## Submission fields
 
 - Change record: the hackathon period started Aug 26 and this project began Oct 10 (from the plan; verify against repo history). `[confirm]`
 - Feedback prize: see `feedback.md`.
-- Tavily prize: `[TODO: only if the Tavily scout shipped; otherwise omit]`
+- Tavily prize: the News scout in the disruption modal searches Tavily server-side and injects a result as a hypothetical disruption labeled `external_search` with its source URL. `[TODO: confirm the team is entering]`
 - Final checks: repo public with the MIT license visible at the root; hosted URL and replay URL work logged out; submit by 09:00 PT Friday.
