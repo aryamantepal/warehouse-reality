@@ -90,16 +90,3 @@ export interface AgentToolCall {
     | "observe";
   parameters: Record<string, unknown>;
 }
-
-export interface DeliberationResult {
-  agentId: EntityId;
-  role: AgentRole;
-  thought: string;
-  isMock: boolean;
-  modelUsed: string;
-  latencyMs: number;
-  toolCall?: AgentToolCall;
-  toolResult?: ToolResult;
-  messageSent?: AgentMessage;
-  escalated?: boolean;
-}
