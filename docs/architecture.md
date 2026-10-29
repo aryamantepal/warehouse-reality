@@ -13,36 +13,32 @@ The strongest submission story is a closed dock causing a driver, dock lead, and
 ```mermaid
 flowchart TD
   Page[Next.js page] --> Dashboard[DashboardLayout]
-  Dashboard --> Hook[useSimulation in browser]
-  Hook --> BrowserEngine[Browser SimulationEngine]
-  Hook --> BrowserRunner[Browser AgentRunner]
-  BrowserRunner --> Local[No browser secret: local fallback]
+  Dashboard --> Hook[useRun]
+  Hook --> Api[/api/runs routes]
+  Api --> Run[lib/run Run: sole engine owner]
+  Run --> Engine[SimulationEngine]
+  Run --> Registry[AgentRunner: agent registry and messages]
+  Run --> Deliberator[Nemotron deliberator]
+  Deliberator --> Nebius[Nebius Token Factory or labeled fallback]
+  Run --> Authorize[Tool contracts: validate, commit, idempotent]
   Dashboard --> Scene[React Three Fiber scene]
-  Fixtures[ILLUSTRATIVE_STATE] --> Scene
-  Fixtures --> Counts[Dashboard counts and fixture records]
-  Counts --> Dashboard
-  Caller[Separate HTTP caller] --> Route[POST /api/agents/deliberate]
-  Route --> ServerRunner[Server AgentRunner]
-  ServerRunner --> Nebius[Nebius Token Factory or fallback]
-  ServerRunner --> ServerEngine[Separate process-local engine]
   Dashboard --> Disruptions[GET or POST /api/disruptions/live]
   Disruptions --> Tavily[Tavily search or fixtures]
 ```
 
-There is no connection from the dashboard deliberation control to the server deliberation route. There is no engine-state input to `FacilityScene`. These are the two most consequential integration gaps.
+The server-owned run in `lib/run` is the only engine. The old browser engine (`useSimulation`) and the standalone `/api/agents/deliberate` route are removed.
 
 ## Modules
 
 | Module | Current behavior |
 | --- | --- |
 | `app/page.tsx`, `components/dashboard/dashboard-layout.tsx` | Page composition, selection, panels, disruption controls and notifications |
-| `lib/dashboard/use-simulation.ts` | Creates browser engine and runner; seeds T-2291 at D-108, yard tractor YT-2 and forklift F-07; invokes local deliberation |
+| `lib/dashboard/use-run.ts` | Browser client for the `/api/runs` routes; holds no engine |
 | `lib/engine/engine.ts` | Entity maps, queued events, movement/unload actions, disruptions, scoped observations, snapshot/restore |
 | `lib/engine/commitments.ts` | Proposal, acceptance, validation, resource acquisition, stale-version rejection, request deduplication, expiry |
 | `lib/engine/invariants.ts` | Physical location, resource availability, coupling and cargo checks; existence of a helper does not establish that every mutation invokes it |
-| `lib/agents/agent-runner.ts` | Four seeded software agents, scoped prompts, in-memory messages/memory, Zod validation and tool dispatch |
-| `lib/agents/nebius-client.ts` | OpenAI-compatible HTTP request to configured Nebius endpoint; deterministic fallback on missing key/error/timeout |
-| `app/api/agents/deliberate/route.ts` | Validates agent/directive/disruption request; uses its own module-level engine and runner |
+| `lib/agents/agent-runner.ts` | Four seeded software agents, in-memory messages and memory (registry only; deliberation is in `nemotron-deliberator.ts`) |
+| `lib/agents/nebius-client.ts` | Message type and `fallbackLocalDeliberation`, the labeled deterministic fallback |
 | `lib/external/tavily-client.ts` | Optional search; keyword-based mapping of articles to hypothetical interventions; fixture fallback |
 | `components/scene/`, `lib/scene/` | Schematic facility, stable entity IDs, model/primitive modes, selection, context recovery; scene uses illustrative state |
 | `lib/dashboard/data.ts` | Evidence records, illustrative timeline, dependencies, summaries and explicit unknown fields |

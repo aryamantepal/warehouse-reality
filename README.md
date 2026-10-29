@@ -42,15 +42,7 @@ Set these server-side values in `.env.local`, then restart the development serve
 
 The model and regional endpoint follow the [official Nebius Nemotron Super quickstart](https://github.com/nebius/token-factory-cookbook/blob/main/models/nemotron/nemotron3-super-120B.md), checked October 26, 2026. Confirm model availability for your account in the Token Factory playground. Provider keys are never browser configuration: do not prefix them with `NEXT_PUBLIC_`. Keep `.env.local` untracked.
 
-Test the **server** inference path locally (uses credits when a key is configured):
-
-```bash
-curl --fail-with-body http://localhost:3000/api/agents/deliberate \
-  -H 'Content-Type: application/json' \
-  -d '{"agentId":"SUP-1","directive":"Summarize the supplied observations in JSON with a thought field. Do not call a tool."}'
-```
-
-Inspect `deliberation.isMock`, `modelUsed`, and `latencyMs`. `isMock: false` identifies a parsed model response; inspect `toolResult` separately to determine whether a proposed action succeeded. Missing credentials, HTTP errors, malformed output, and the 60-second timeout use fallback. An HTTP 200 alone is not evidence of live inference. The dashboard does **not yet call this route**; adding a key alone will not enable live dashboard agents.
+Inference runs only inside the server-owned run (`/api/runs`). Each model call records its model id, tokens, latency and whether it was a fallback. Missing credentials, HTTP errors, malformed output and timeouts use a labeled fallback; an HTTP 200 alone is not evidence of live inference.
 
 The hackathon requires actual NVIDIA open-model inference on Nebius. Offline fallback is useful for development but does not satisfy that requirement. [Nebius API documentation](https://docs.tokenfactory.nebius.com/api-reference/introduction) describes authentication and compatible requests.
 
@@ -64,7 +56,7 @@ The hackathon requires actual NVIDIA open-model inference on Nebius. Offline fal
 | `lib/engine/` | State, event queue, physical checks, commitments, snapshots |
 | `lib/agents/` | Role prompts, memory/messages, tool schemas, runner, Nebius client |
 | `lib/external/` | Tavily search and illustrative fallback disruptions |
-| `lib/dashboard/` | React simulation hook and dashboard fixture data |
+| `lib/dashboard/` | Run client hook and dashboard fixture data |
 | `lib/scene/` | Facility constants, schematic layout, illustrative entities |
 | `types/` | Dashboard view types |
 | `docs/` | Product requirements, architecture, submission plan, research, earlier mockups |
