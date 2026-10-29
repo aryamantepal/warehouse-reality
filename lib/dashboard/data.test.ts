@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { ILLUSTRATIVE_STATE } from "@/lib/scene/illustrative-state";
 import {
   calculateDashboardCounts,
   DEPENDENCIES,
+  doorIdsWithStatus,
   EVIDENCE_RECORDS,
   getEntitiesForFilter,
   UNKNOWN_DFW_FIELDS,
@@ -53,5 +55,16 @@ describe("Dashboard Data & Accounting", () => {
     expect(dockSpecs).toBeDefined();
     expect(dockSpecs?.kind).toBe("src");
     expect(dockSpecs?.source).toContain("dfwcommercecenter.com");
+  });
+
+  it("lists entities and closed doors from a given scene state", () => {
+    const state = {
+      ...ILLUSTRATIVE_STATE,
+      doors: ILLUSTRATIVE_STATE.doors.map((d) =>
+        d.id === "D-001" ? { ...d, status: "closed" as const } : d,
+      ),
+    };
+    expect(doorIdsWithStatus(state, "closed")).toContain("D-001");
+    expect(getEntitiesForFilter("doors", state)).toHaveLength(186);
   });
 });

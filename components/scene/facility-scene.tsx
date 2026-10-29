@@ -253,7 +253,7 @@ export const FacilityScene = ({
         onCreated={onCreated}
         onPointerMissed={onPointerMissed}
         role="img"
-        aria-label="Schematic 3D view of DFW Commerce Center Building I with an illustrative run state"
+        aria-label="Schematic 3D view of DFW Commerce Center Building I (schematic layout; run state from the engine when a run exists)"
       >
         <MotionClock
           motion={motion}
