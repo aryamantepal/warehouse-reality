@@ -1,10 +1,53 @@
-# Warehouse Sim · ShiftWorld
+# Warehouse Sim
 
-Warehouse decision rehearsal for the Nebius × NVIDIA Global AI Hackathon. Explore a warehouse in 3D, inject a disruption, and inspect how driver, dock, yard, and supervisor agents propose operational changes. A TypeScript engine owns resource reservations and physical state.
+Warehouse decision rehearsal for the Nebius x NVIDIA Global AI Hackathon (track: Best Apps and Agents).
 
-**Status: working prototype with incomplete integration.** The browser dashboard currently uses a local engine and deterministic agent fallback. The server deliberation API can call Nebius independently. The scene and several dashboard summaries still use illustrative data. See [architecture and known gaps](docs/architecture.md) before treating a displayed outcome as an executed simulation.
+- Hosted demo: `<HOSTED_URL>`
+- Recorded run (no key needed): `<HOSTED_URL>/?replay=d108`
+- Demo video (YouTube): `<VIDEO_URL>`
 
-The product plan calls this application **ShiftWorld**; the package and interface currently use **Warehouse Sim**.
+## What it is
+
+A supervisor rehearses a warehouse disruption before acting on it. Close dock door D-108 and four software agents (a driver, a dock lead, a yard controller and a supervisor) negotiate a way out through structured messages. Each agent sees only its own observation. A deterministic TypeScript engine owns physical state, resource reservations and logical time, and it is the only thing that can change them.
+
+The agents run on NVIDIA Nemotron models served from Nebius Token Factory, one model tier per role. The dashboard shows, for every agent turn, which model answered, how long it took, how many tokens it used, and whether that turn was a real Nemotron reply or a labeled fallback. A comparison panel replays the same scenario under first-come-first-served rules so the two can be read side by side.
+
+This is a rehearsal tool, not a validated replica of any real warehouse. See [Evidence and scope](#evidence-and-scope).
+
+## How agents negotiate through engine tool contracts
+
+1. A model reply is only a proposal. `lib/agents/nemotron-deliberator.ts` asks the role's model for JSON, strips any code fence, and validates the `toolCall` against a Zod schema (`lib/agents/schemas.ts`). Text-only, malformed or unknown-tool replies propose nothing and are recorded as `malformed_tool_call` fallbacks.
+2. The proposal goes through `lib/run/authorize.ts`, a role permission matrix that returns `PERMISSION_DENIED` when an agent acts outside its role.
+3. `lib/run/proposal-adapter.ts` turns it into an engine commitment, and `lib/run/turns.ts` calls the engine's tool contracts: propose, accept, commit, executeMove, executeUnload, cancel, escalate. The engine validates and commits atomically, rejects stale state versions, deduplicates request IDs, and rejects conflicting reservations with `RESOURCE_UNAVAILABLE`.
+4. Accepted and rejected outcomes both become visible run events. Rendering never decides an outcome; the engine and agents work with graphics disabled.
+
+The scenario (`lib/run/scenarios/d108.ts`): trailer T-2291 is at D-108 with a shipment partly unloaded. Closing D-108 forces a relocation. The target is dock D-112, and a second trailer, T-3061, is a contender for the same resources. All of these are scenario values chosen for the rehearsal, not facility data.
+
+### Model tiers
+
+| Tier | Default model id | Roles |
+| --- | --- | --- |
+| nano | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | driver |
+| super | `nvidia/nemotron-3-super-120b-a12b` | dock lead, yard controller |
+| ultra | `nvidia/Nemotron-3-Ultra-550b-a55b` | supervisor |
+
+Defaults live in `lib/agents/models.ts` and can be overridden per tier with `NEBIUS_MODEL_NANO`, `NEBIUS_MODEL_SUPER`, `NEBIUS_MODEL_ULTRA`. Whether each id is available on a given Token Factory account is checked by `scripts/smoke-token-factory.ts`; availability is not asserted here.
+
+Each run has a budget cap of 60 model calls and 150,000 tokens. When either is reached, remaining turns use the first-come baseline and are labeled `BASELINE`.
+
+## Provenance labels
+
+Nothing shown as model output is unlabeled.
+
+| Label | Meaning |
+| --- | --- |
+| `NEMOTRON` | A real Token Factory reply that passed validation. Shows model id, tier, latency and tokens ("unknown" if the provider reported no usage). |
+| `FALLBACK` | The model call failed (`no_api_key`, `http_error`, `timeout`, `malformed_tool_call`, `budget_exhausted`) and deterministic local rules stood in. Never displayed as Nemotron. |
+| `BASELINE` | A first-come-first-served turn: the comparison run, or turns after the budget cap. No model is called. |
+| `external_search` | A disruption that carries source URLs from an outside search. The run API accepts `sources` on a disruption and tags the event this way. The Tavily search client itself is not on this branch (see Known gaps). |
+| `CLAUDE (TEST)` | Reserved for turns answered by a Claude test stand-in. Not implemented in the code at this commit, so no such label is rendered. `<TODO: confirm with the team whether this ships>` |
+
+Other event labels are `engine`, `operator` (a human-injected hypothetical), and `replay`. The facility panel also uses `src`, `drv`, `hyp`, `unk` and `ill` badges for sourced, derived, hypothetical, unknown and illustrative values.
 
 ## Run locally
 
@@ -19,7 +62,32 @@ cp -n .env.example .env.local
 pnpm dev
 ```
 
-Open [localhost:3000](http://localhost:3000). No credentials are needed to explore the illustrative dashboard or run unit tests. A WebGL-capable browser is needed for the 3D scene.
+Open [localhost:3000](http://localhost:3000). With no key, every turn is a labeled `FALLBACK` or `BASELINE`, which is useful for development and does not satisfy the hackathon's NVIDIA-on-Nebius requirement. A WebGL-capable browser is needed for the 3D scene.
+
+Try it: press **Run the D-108 scenario** (start a run, close D-108, step until done), or use **Disruption** and **Step** yourself, then open **Compare with first-come rules**.
+
+## Recorded run (replay)
+
+Open `/?replay=d108` (or press "Watch recorded run"). The browser fetches `/runs/d108-nebius.json`, falls back to `/runs/d108-fallback.json`, validates the file, and replays it through an in-browser engine. It needs no key, makes no model call and starts no server run, so it is the safest way for a judge to see a result. A banner states that it is a recording, when it was made and which models answered. A fallback recording is labeled "not Nemotron". If no recording file is deployed, the UI says "No recording yet".
+
+`public/runs/d108-nebius.json` is created by `node scripts/record-run.ts --base http://localhost:3000` against a dev server with a real key. `<TODO: the team commits the real recording; none is committed at this commit>`
+
+## Environment variables
+
+Server-side only. Never prefix with `NEXT_PUBLIC_`; the browser never calls Token Factory.
+
+| Variable | Purpose |
+| --- | --- |
+| `NEBIUS_API_KEY` | Token Factory API key; blank means every turn is a labeled fallback |
+| `NEBIUS_BASE_URL` | Defaults to `https://api.tokenfactory.us-central1.nebius.com/v1` |
+| `NEBIUS_MODEL` | Default `nvidia/nemotron-3-super-120b-a12b` (see `.env.example`) |
+| `NEBIUS_MODEL_NANO`, `NEBIUS_MODEL_SUPER`, `NEBIUS_MODEL_ULTRA` | Optional per-tier overrides; blank uses the default |
+| `NEBIUS_SMOKE_MAX_TOKENS` | Optional completion cap for the smoke script (default 4096) |
+| `TAVILY_API_KEY` | Optional; listed in `.env.example` for external-disruption search |
+
+The model and regional endpoint follow the [official Nebius Nemotron Super quickstart](https://github.com/nebius/token-factory-cookbook/blob/main/models/nemotron/nemotron3-super-120B.md), checked October 26, 2026. Inference runs only inside the server-owned run (`/api/runs`). An HTTP 200 alone is not evidence of live inference; check the `NEMOTRON` tag. [Nebius API documentation](https://docs.tokenfactory.nebius.com/api-reference/introduction).
+
+## Tests
 
 ```bash
 pnpm check       # Biome, generated route types, TypeScript, unit tests
@@ -27,24 +95,9 @@ pnpm build       # production build (next/font downloads Google fonts)
 pnpm start       # serve a successful production build
 ```
 
-Individual checks: `pnpm lint`, `pnpm typecheck`, `pnpm test`. GitHub Actions runs these checks and the production build without provider secrets.
+Individual checks: `pnpm lint`, `pnpm typecheck`, `pnpm test`. Provider tests use mocked HTTP responses. Unit tests passing is not evidence that a live Nebius run works. To check which tiers a key can reach, run `node scripts/smoke-token-factory.ts`.
 
-## NVIDIA inference on Nebius
-
-Set these server-side values in `.env.local`, then restart the development server:
-
-| Variable | Purpose |
-| --- | --- |
-| `NEBIUS_API_KEY` | Token Factory API key; blank enables deterministic fallback |
-| `NEBIUS_BASE_URL` | Defaults to `https://api.tokenfactory.us-central1.nebius.com/v1` |
-| `NEBIUS_MODEL` | Defaults to `nvidia/nemotron-3-super-120b-a12b` |
-| `TAVILY_API_KEY` | Optional external-disruption search; blank returns illustrative fixtures |
-
-The model and regional endpoint follow the [official Nebius Nemotron Super quickstart](https://github.com/nebius/token-factory-cookbook/blob/main/models/nemotron/nemotron3-super-120B.md), checked October 26, 2026. Confirm model availability for your account in the Token Factory playground. Provider keys are never browser configuration: do not prefix them with `NEXT_PUBLIC_`. Keep `.env.local` untracked.
-
-Inference runs only inside the server-owned run (`/api/runs`). Each model call records its model id, tokens, latency and whether it was a fallback. Missing credentials, HTTP errors, malformed output and timeouts use a labeled fallback; an HTTP 200 alone is not evidence of live inference.
-
-The hackathon requires actual NVIDIA open-model inference on Nebius. Offline fallback is useful for development but does not satisfy that requirement. [Nebius API documentation](https://docs.tokenfactory.nebius.com/api-reference/introduction) describes authentication and compatible requests.
+Deployment (single long-lived instance, because runs live in memory): [docs/deploy.md](docs/deploy.md).
 
 ## Repository map
 
@@ -55,13 +108,20 @@ The hackathon requires actual NVIDIA open-model inference on Nebius. Offline fal
 | `components/scene/` | React Three Fiber scene, selection, assets, graphics recovery |
 | `lib/engine/` | State, event queue, physical checks, commitments, snapshots |
 | `lib/agents/` | Role prompts, memory/messages, tool schemas, runner, Nebius client |
-| `lib/external/` | Tavily search and illustrative fallback disruptions |
-| `lib/dashboard/` | Run client hook and dashboard fixture data |
+| `lib/run/` | Server-owned run: tool authorization, proposal adapter, baseline and replay deliberators, metrics, recording |
+| `lib/dashboard/` | Run client hook, badges, comparison and replay view models, fixture data |
 | `lib/scene/` | Facility constants, schematic layout, illustrative entities |
 | `types/` | Dashboard view types |
 | `docs/` | Product requirements, architecture, submission plan, research, earlier mockups |
 
-Read [the architecture](docs/architecture.md), [submission checklist and demo plan](docs/hackathon.md), and [product requirements](docs/idea_intro.md), in that order. The PRD's acceptance catalogue is a target, not a report that every feature is implemented.
+Read [the architecture](docs/architecture.md), [submission checklist and demo plan](docs/hackathon.md), and [product requirements](docs/idea_intro.md), in that order. The PRD's acceptance catalogue is a target, not a report that every feature is implemented. Submission drafts are in [docs/submission/](docs/submission/).
+
+## Known gaps
+
+- No Nebius recording is committed yet, and no live inference has been verified from this repository.
+- The Tavily search client (`lib/external`) is not on this branch; the `external_search` label exists only on the disruption API path.
+- The facility layout is schematic until a site plan is traced, and the UI says so.
+- `docs/architecture.md` is dated October 26 and partly predates the server-owned run; where they differ, the code wins.
 
 ## Evidence and scope
 
