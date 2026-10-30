@@ -6,6 +6,7 @@
 import type {
   Deliberator,
   ModelCall,
+  ModelProvider,
   ModelTier,
   Provenance,
   RunBudget,
@@ -18,6 +19,7 @@ import { AgentRunner } from "../agents/agent-runner";
 import type { AgentRole } from "../agents/types";
 import { SimulationEngine } from "../engine/engine";
 import type { DisruptionBody } from "./api-schemas";
+import type { RecordedDecision, RecordedDisruption } from "./recording-schema";
 import { seedD108 } from "./scenarios/d108";
 import { affectedAgentIds, runTool, type ToolOutcome } from "./turns";
 
@@ -39,10 +41,13 @@ const provenanceOf = (
   kind: Deliberator["kind"],
   isFallback: boolean,
   exhausted: boolean,
+  provider?: ModelProvider,
 ): Provenance => {
   if (exhausted || kind === "baseline") return "baseline";
   if (isFallback) return "fallback";
-  return kind === "nemotron" ? "nemotron" : "replay";
+  if (kind !== "nemotron") return "replay";
+  // A Claude call is never labelled nemotron.
+  return provider === "anthropic" ? "test_model" : "nemotron";
 };
 
 export class Run {
@@ -58,6 +63,8 @@ export class Run {
   private commitmentCounter = 0;
   private disruptionCounter = 0;
   private turns = 0;
+  private readonly decisionLog: RecordedDecision[] = [];
+  private readonly disruptionLog: RecordedDisruption[] = [];
   private running = false;
   private failed = false;
 
@@ -80,6 +87,21 @@ export class Run {
 
   get busy(): boolean {
     return this.running;
+  }
+
+  get turnCount(): number {
+    return this.turns;
+  }
+
+  /** Raw material for `exportRun`; deep-copied so callers cannot mutate the run. */
+  recordingParts(): {
+    decisions: RecordedDecision[];
+    disruptions: RecordedDisruption[];
+  } {
+    return structuredClone({
+      decisions: this.decisionLog,
+      disruptions: this.disruptionLog,
+    });
   }
 
   snapshot(): RunSnapshot {
@@ -112,6 +134,10 @@ export class Run {
   injectDisruption(body: DisruptionBody): StepResult {
     if (this.running) throw new Error("RUN_BUSY");
     const start = this.events.length;
+    this.disruptionLog.push({
+      afterDecisions: this.turns,
+      body: structuredClone(body),
+    });
     const disruptionId = `H-${++this.disruptionCounter}`;
     const result =
       body.type === "external_delay"
@@ -191,6 +217,7 @@ export class Run {
     this.queue.shift();
     this.read.set(agentId, agent.inbox.length);
     this.turns += 1;
+    this.decisionLog.push({ agentId, decision: structuredClone(decision) });
     this.countSpend(deliberator.kind, decision.call);
 
     const outcome = runTool(decision.toolCall, {
@@ -200,7 +227,12 @@ export class Run {
       proposers: this.proposers,
     });
     const isFallback = decision.call.isFallback || exhausted;
-    const provenance = provenanceOf(deliberator.kind, isFallback, exhausted);
+    const provenance = provenanceOf(
+      deliberator.kind,
+      isFallback,
+      exhausted,
+      decision.call.provider,
+    );
     const call: ModelCall = {
       ...decision.call,
       id: `MC-${this.modelCalls.length + 1}`,

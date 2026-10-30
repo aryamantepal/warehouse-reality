@@ -30,7 +30,7 @@ export interface RunMetrics {
   /** Rejected tool outcomes from any deliberator; no_tool is not counted. */
   invalidProposals: number;
   /**
-   * Real model calls: turns whose event provenance is "nemotron" and that are
+   * Real model calls: turns whose event provenance is "nemotron" or "test_model" and that are
    * not fallbacks. Baseline, scripted, replay and fallback turns are excluded.
    */
   modelCalls: number;
@@ -50,7 +50,7 @@ const countedCalls = (snapshot: RunSnapshot): ModelCall[] => {
       .filter(
         (e) =>
           e.type === "agent_turn" &&
-          e.provenance === "nemotron" &&
+          (e.provenance === "nemotron" || e.provenance === "test_model") &&
           e.causationId !== undefined,
       )
       .map((e) => e.causationId),

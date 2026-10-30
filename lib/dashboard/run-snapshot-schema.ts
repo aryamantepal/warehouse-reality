@@ -250,6 +250,7 @@ const AgentStateSchema = z.object({
 const ProvenanceSchema = z.enum([
   "engine",
   "nemotron",
+  "test_model",
   "fallback",
   "baseline",
   "operator",
@@ -280,6 +281,7 @@ const ModelCallSchema = z.object({
   role: RoleSchema,
   tier: z.enum(["nano", "super", "ultra"]),
   model: z.string().min(1),
+  provider: z.enum(["nebius", "anthropic"]).optional(),
   isFallback: z.boolean(),
   fallbackReason: z
     .enum([
