@@ -58,6 +58,8 @@ export const ProvenanceBadge = ({
 const RUN_STYLES: Readonly<Record<Provenance, string>> = {
   engine: BADGE_STYLES.eng,
   nemotron: "bg-lime-100 text-lime-800 dark:bg-lime-400/15 dark:text-lime-300",
+  test_model:
+    "bg-orange-100 text-orange-800 dark:bg-orange-400/15 dark:text-orange-300",
   fallback: "bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-300",
   baseline: "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200",
   operator: BADGE_STYLES.hyp,

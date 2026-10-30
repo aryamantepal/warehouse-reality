@@ -12,6 +12,7 @@ import { z } from "zod";
 import type {
   Deliberator,
   FallbackReason,
+  ModelProvider,
   TurnDecision,
   TurnInput,
 } from "../../types/run";
@@ -20,6 +21,11 @@ import {
   D108_BASELINE_POLICY,
 } from "../run/baseline-deliberator";
 import { AgentRunner } from "./agent-runner";
+import {
+  anthropicTestModel,
+  requestAnthropicToolCall,
+  selectProvider,
+} from "./anthropic-client";
 import { modelFor, NEBIUS_DEFAULT_BASE_URL } from "./models";
 import { requestToolCall, type ToolCallResponse } from "./nebius-client";
 import { buildTurnMessages, type TurnContext } from "./prompts";
@@ -61,11 +67,13 @@ const callOf = (
   model: string,
   usage: Usage,
   fallbackReason?: FallbackReason,
+  provider?: ModelProvider,
 ): TurnDecision["call"] => ({
   agentId: input.agent.id,
   role: input.agent.role,
   tier: input.tier,
   model,
+  ...(provider ? { provider } : {}),
   isFallback: fallbackReason !== undefined,
   ...(fallbackReason ? { fallbackReason } : {}),
   latencyMs: usage.latencyMs,
@@ -121,9 +129,10 @@ const malformed = (
   model: string,
   detail: string,
   usage: Usage,
+  provider?: ModelProvider,
 ): TurnDecision => ({
   thought: `Fallback (malformed_tool_call): ${model} replied without a valid tool call (${detail}); no action this turn.`,
-  call: callOf(input, model, usage, "malformed_tool_call"),
+  call: callOf(input, model, usage, "malformed_tool_call", provider),
 });
 
 const thoughtOf = (
@@ -139,9 +148,11 @@ const fromReply = (
   input: TurnInput,
   model: string,
   reply: Extract<ToolCallResponse, { ok: true }>,
+  provider?: ModelProvider,
 ): TurnDecision => {
   const usage: Usage = reply;
-  if (reply.unreadable) return malformed(input, model, reply.unreadable, usage);
+  if (reply.unreadable)
+    return malformed(input, model, reply.unreadable, usage, provider);
   if (!reply.toolCall) {
     const why =
       reply.finishReason === "length"
@@ -149,22 +160,22 @@ const fromReply = (
         : reply.content?.trim()
           ? "text only"
           : "no content";
-    return malformed(input, model, why, usage);
+    return malformed(input, model, why, usage, provider);
   }
   const parsed = parseToolCall(reply.toolCall.name, reply.toolCall.arguments);
   switch (parsed.kind) {
     case "invalid":
-      return malformed(input, model, parsed.detail, usage);
+      return malformed(input, model, parsed.detail, usage, provider);
     case "wait":
       return {
         thought: parsed.reason.slice(0, MAX_THOUGHT_CHARS),
-        call: callOf(input, model, usage),
+        call: callOf(input, model, usage, undefined, provider),
       };
     case "tool":
       return {
         thought: thoughtOf(reply, `Called ${parsed.toolCall.tool}.`),
         toolCall: parsed.toolCall,
-        call: callOf(input, model, usage),
+        call: callOf(input, model, usage, undefined, provider),
       };
   }
 };
@@ -175,23 +186,40 @@ const decide = async (
 ): Promise<TurnDecision> => {
   const env = NebiusEnv.safeParse(process.env);
   if (!env.success) throw new Error("NEBIUS_BASE_URL is not a valid URL.");
-  const apiKey = env.data.NEBIUS_API_KEY;
+  const provider = selectProvider(process.env);
+  const apiKey =
+    provider === "anthropic"
+      ? process.env.ANTHROPIC_API_KEY?.trim()
+      : env.data.NEBIUS_API_KEY;
   if (!apiKey) return localFallback(fallback, input, "no_api_key", NO_USAGE);
 
-  const model = modelFor(input.tier);
-  const reply = await requestToolCall({
-    apiKey,
-    baseUrl: env.data.NEBIUS_BASE_URL ?? NEBIUS_DEFAULT_BASE_URL,
-    model,
-    messages: buildTurnMessages(input, D108_TURN_CONTEXT),
-    tools: AGENT_CHAT_TOOLS,
-    timeoutMs: NEMOTRON_TIMEOUT_MS,
-    maxTokens: NEMOTRON_MAX_TOKENS,
-  });
+  // TEST ONLY: with no Nebius key, a Claude model answers every tier.
+  const model =
+    provider === "anthropic" ? anthropicTestModel() : modelFor(input.tier);
+  const messages = buildTurnMessages(input, D108_TURN_CONTEXT);
+  const reply =
+    provider === "anthropic"
+      ? await requestAnthropicToolCall({
+          apiKey,
+          model,
+          messages,
+          tools: AGENT_CHAT_TOOLS,
+          timeoutMs: NEMOTRON_TIMEOUT_MS,
+          maxTokens: NEMOTRON_MAX_TOKENS,
+        })
+      : await requestToolCall({
+          apiKey,
+          baseUrl: env.data.NEBIUS_BASE_URL ?? NEBIUS_DEFAULT_BASE_URL,
+          model,
+          messages,
+          tools: AGENT_CHAT_TOOLS,
+          timeoutMs: NEMOTRON_TIMEOUT_MS,
+          maxTokens: NEMOTRON_MAX_TOKENS,
+        });
   if (!reply.ok) {
     // `detail` is already redacted by the client.
     console.warn(
-      `Nemotron ${model} turn for ${input.agent.id} fell back (${reply.reason}): ${reply.detail}`,
+      `${provider} ${model} turn for ${input.agent.id} fell back (${reply.reason}): ${reply.detail}`,
     );
     return localFallback(fallback, input, reply.reason, {
       latencyMs: reply.latencyMs,
@@ -199,7 +227,7 @@ const decide = async (
       completionTokens: null,
     });
   }
-  return fromReply(input, model, reply);
+  return fromReply(input, model, reply, provider);
 };
 
 /** `fallback` acts when there is no Nemotron answer; D-108 FCFS by default. */

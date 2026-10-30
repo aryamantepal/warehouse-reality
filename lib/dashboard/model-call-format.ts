@@ -12,6 +12,7 @@ export const UNKNOWN = "unknown";
 export const PROVENANCE_LABEL: Readonly<Record<Provenance, string>> = {
   engine: "engine",
   nemotron: "Nemotron",
+  test_model: "CLAUDE (TEST)",
   fallback: "fallback",
   baseline: "FCFS baseline",
   operator: "operator",
@@ -22,6 +23,7 @@ export const PROVENANCE_LABEL: Readonly<Record<Provenance, string>> = {
 export const PROVENANCE_TITLE: Readonly<Record<Provenance, string>> = {
   engine: "Recorded by the authoritative engine",
   nemotron: "Decided by an NVIDIA Nemotron model call",
+  test_model: "TEST ONLY: decided by a Claude test model, not Nemotron",
   fallback: "The model call failed; a local fallback decided this turn",
   baseline: "Decided by the first-come-first-served rules, not a model",
   operator: "Injected by the operator as a hypothetical",
