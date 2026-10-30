@@ -6,7 +6,7 @@ The live app ships as one Docker image (`Dockerfile` at the repo root). It runs 
 
 Deploy from a `main` commit that passes every gate below. Run the commands from the repo root.
 
-1. **The old deliberation route is gone.** `POST /api/agents/deliberate` has no auth, no rate limit and no budget, and it calls Nebius on every request. Lane A deletes it in bead `ws-vee.12`. This must print nothing:
+1. **The old deliberation route is gone.** `POST /api/agents/deliberate` had no auth, no rate limit and no budget, and called Nebius on every request. It is deleted on the merged line. This must print nothing:
 
    ```bash
    git ls-files app/api/agents
@@ -14,7 +14,7 @@ Deploy from a `main` commit that passes every gate below. Run the commands from 
 
    If it prints a file, don't set `NEBIUS_API_KEY` on the host. The app then runs on the labeled fallback only.
 
-2. **Live mode calls Nemotron.** Today `lib/run/registry.ts` uses `ScriptedDeliberator` for live runs, so every model call reports `model: "scripted"`. Real calls need B2 (`createNemotronDeliberator`) merged and lane A's one-line wiring in the registry. This must print a line:
+2. **Live mode calls Nemotron.** `lib/run/registry.ts` wires `createNemotronDeliberator` for live runs on the merged line. If it still uses `ScriptedDeliberator`, every model call reports `model: "scripted"`. This must print a line:
 
    ```bash
    git grep -n createNemotronDeliberator lib/run/registry.ts
@@ -41,7 +41,7 @@ Runs are owned by the server and kept in memory (`lib/run/registry.ts`). There i
 - **Don't restart or redeploy during the demo.** A restart or redeploy empties the registry, and any open browser tab then gets `RUN_NOT_FOUND`. Starting a new run recovers.
 - **The registry holds 20 runs.** Creating a 21st run evicts the oldest idle run, with no restart involved. A tab whose run was evicted gets `404 RUN_NOT_FOUND` on its next step. Each demo start and each comparison creates a run, so a busy judging hour can hit this. Lane A follow-up: raise `MAX_RUNS` or evict by idle time instead of by count.
 
-Replay (`/?replay=d108`, once it ships) reads a static JSON file and survives restarts.
+Replay (`/?replay=d108`) reads a static JSON file and survives restarts. See "Recorded run (replay)" below.
 
 ## Spend and abuse
 
@@ -63,9 +63,10 @@ Set these as runtime environment variables on the host, never as build arguments
 | --- | --- | --- |
 | `NEBIUS_API_KEY` | For real inference | Nebius Token Factory key. Without it every model call is the labeled fallback (`fallbackReason: "no_api_key"`), which does not meet the hackathon inference requirement. |
 | `NEBIUS_BASE_URL` | No | Token Factory base URL. Defaults to the us-central1 endpoint (`lib/agents/nebius-client.ts`, `lib/agents/models.ts`). |
-| `NEBIUS_MODEL_NANO`, `NEBIUS_MODEL_SUPER`, `NEBIUS_MODEL_ULTRA` | No | Per-tier model overrides (`lib/agents/models.ts`). A blank value uses the tier default. The app reads them only once B2 is wired in; before that, only `scripts/smoke-token-factory.ts` reads them. |
-| `NEBIUS_MODEL` | No | Model id for the old `/api/agents/deliberate` route (`lib/agents/nebius-client.ts`). It has no effect on runs. |
-| `TAVILY_API_KEY` | No | External-disruption search. Nothing reads it until B6 merges. Don't set it before then. |
+| `NEBIUS_MODEL_NANO`, `NEBIUS_MODEL_SUPER`, `NEBIUS_MODEL_ULTRA` | No | Per-tier model overrides (`lib/agents/models.ts`). A blank value uses the tier default. The Nemotron deliberator and `scripts/smoke-token-factory.ts` read them. |
+| `NEBIUS_MODEL` | No | Unused by runs since the old route was removed; listed in `.env.example` only. Use the per-tier overrides. |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_TEST_MODEL` | **Never on the host** | Test-only Claude provider, used only when `NEBIUS_API_KEY` is blank. Calls are labeled `CLAUDE (TEST)`, never Nemotron. Don't set them on the deployed instance. |
+| `TAVILY_API_KEY` | No | Tavily disruption scout (`POST /api/disruptions/live`). Without it the route returns labeled illustrative fixtures. Results are cached for 10 minutes per query and the route is rate limited. |
 | `PORT`, `HOSTNAME` | No | Already set in the image (`3000`, `0.0.0.0`). Override `PORT` only if the host requires a specific port. |
 
 Check `.env.example` for the current list before deploying. Never put a value in this file, in the Dockerfile, or in a commit.
@@ -86,7 +87,7 @@ To smoke-test it locally, pass the key from your shell and don't hard-code it:
 docker run --rm -p 3000:3000 -e NEBIUS_API_KEY warehouse-sim:latest
 ```
 
-Once B6 merges, add `-e TAVILY_API_KEY`.
+Add `-e TAVILY_API_KEY` for the optional Tavily scout (`POST /api/disruptions/live`, cached 10 minutes per query and rate limited).
 
 ## Primary target: Nebius Serverless AI endpoint (CPU)
 
@@ -185,6 +186,24 @@ Prerequisites:
 
 Not verified yet, because no Nebius account was available when this was written: the managed HTTPS proxy's request timeout for slow `POST /api/runs/<id>/step` calls. The step timing check in the checklist measures it.
 
+## Recorded run (replay)
+
+`/?replay=d108` (or the "Watch recorded run" button, also offered when a run is `RUN_NOT_FOUND`) fetches a static recording from `public/runs/`, validates it, and replays it through an in-browser engine. It needs no key, makes no model call and starts no server run, so it survives restarts and covers the case where the live endpoint is down.
+
+The loader tries these files in order and moves on only on a 404:
+
+1. `public/runs/d108-nebius.json`: a real Nemotron recording. Only turns genuinely answered by a Nebius model may produce this file.
+2. `public/runs/d108-fallback.json`: no model answered; the banner says "not Nemotron".
+3. `public/runs/d108-test-model.json`: a Claude test recording; the banner says "Test recording (Claude), not Nemotron". Never submit it as Nemotron output.
+
+Create a recording against a running server (dev or built) that has a real key, then commit the file:
+
+```bash
+node scripts/record-run.ts --base http://localhost:3000
+```
+
+The script starts a live run, closes D-108, steps until done, and reads `GET /api/runs/<id>/export`. It chooses the output name from who answered, and prints a warning when the file is not a Nemotron recording. `--out <path>` overrides the name. If no recording is deployed, the UI says "No recording yet".
+
 ## Fallback: Render (one paid instance)
 
 Use this fallback if the Nebius endpoint can't be created (quota, platform availability, or the proxy timing out on step calls). Any host works if it runs one long-lived container with no idle spin-down.
@@ -248,7 +267,7 @@ Run these against the hosted URL (`APP_URL`). Browser checks use a fresh browser
 
   It must print `200`. A `502` or `504` at a round time (such as `60.0s`) means the proxy cut the request. The server keeps stepping anyway, so the browser's next step gets `409 RUN_BUSY` until that step finishes. Fix: make `stepRunRequest` in `lib/dashboard/run-client.ts` send `{ maxTurns: 1 }` or `2` (lane B follow-up), or move to the Render fallback.
 
-- [ ] `/?replay=d108` plays the recorded run with no key involved, once the replay half of B8 ships.
+- [ ] `/?replay=d108` plays the recorded run with no key involved. The banner states when it was recorded and which models answered; a Claude recording says "Test recording (Claude), not Nemotron".
 
 - [ ] An unknown run id returns 404 with `RUN_NOT_FOUND`:
 
