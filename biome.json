@@ -13,7 +13,8 @@
       "!.next",
       "!dist",
       "!build",
-      "!docs/mockups"
+      "!docs/mockups",
+      "!.claude"
     ]
   },
   "formatter": {
