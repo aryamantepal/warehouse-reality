@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SceneStatus } from "@/components/scene/facility-scene";
 import { SceneLoader } from "@/components/scene/scene-loader";
+import { TextureButton } from "@/components/ui/texture-button";
 import {
   calculateDashboardCounts,
   TIMELINE_EVENTS,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/dashboard/data";
 import { failureOf, type GuidedApi } from "@/lib/dashboard/guided-demo";
 import { callsWithoutUsage } from "@/lib/dashboard/model-call-format";
+import { NO_RECORDING } from "@/lib/dashboard/replay";
 import { useRun } from "@/lib/dashboard/use-run";
 import type { DisruptionBody } from "@/lib/run/api-schemas";
 import { keepSameScene, sceneStateFromEngine } from "@/lib/scene/from-engine";
@@ -19,10 +21,12 @@ import { DEFAULT_VIEW, type ViewSettings } from "@/lib/scene/view-settings";
 import type { TabKey } from "@/types/dashboard";
 import { BudgetMeter } from "./budget-meter";
 import { CausalTimeline } from "./causal-timeline";
+import { ComparePanel } from "./compare-panel";
 import { DisruptionModal } from "./disruption-modal";
 import { FacilityPanel } from "./facility-panel";
 import { GuidedDemo } from "./guided-demo";
 import { InspectorPanel } from "./inspector-panel";
+import { ReplayBanner } from "./replay-banner";
 import { SettingsPane } from "./settings-pane";
 import { TopBar, ViewMenu } from "./top-bar";
 
@@ -54,7 +58,35 @@ export const DashboardLayout = () => {
 
   // The server-owned run is the only source of run state.
   const run = useRun();
-  const { snapshot, view: runView } = run;
+  const { snapshot, view: runView, recording } = run;
+  const { disrupt: runDisrupt, start: runStart, replayRecorded } = run;
+  // Disruptions applied to the current run, replayed onto the baseline (B7).
+  const [applied, setApplied] = useState<DisruptionBody[]>([]);
+  const trackedDisrupt = useCallback(
+    async (body: DisruptionBody) => {
+      const r = await runDisrupt(body);
+      if (!failureOf(r)) setApplied((prev) => [...prev, body]);
+      return r;
+    },
+    [runDisrupt],
+  );
+  const trackedStart = useCallback(
+    (mode: Parameters<typeof runStart>[0]) => {
+      setApplied([]);
+      return runStart(mode);
+    },
+    [runStart],
+  );
+  const compareDisruptions = recording
+    ? recording.disruptions.map((d) => d.body)
+    : applied;
+
+  // ?replay=d108 opens the recorded run directly: the hosted-demo entry point.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("replay") === "d108") {
+      void replayRecorded();
+    }
+  }, [replayRecorded]);
   // A run update that moved nothing keeps the same scene object, so the camera,
   // layout and ambient motion are not rebuilt on every step.
   const lastScene = useRef<SceneState | undefined>(undefined);
@@ -112,7 +144,7 @@ export const DashboardLayout = () => {
 
   const handleInjectDisruption = useCallback(
     async (body: DisruptionBody) => {
-      const r = await run.disrupt(body);
+      const r = await trackedDisrupt(body);
       const failure = failureOf(r);
       if (failure) {
         showToast(`Disruption failed: ${failure}`);
@@ -121,21 +153,21 @@ export const DashboardLayout = () => {
       showToast(`Injected ${body.type} on ${body.targetId} into the run`);
       handleSelectEntity(body.targetId);
     },
-    [run.disrupt, handleSelectEntity, showToast],
+    [trackedDisrupt, handleSelectEntity, showToast],
   );
 
   // The guided flow uses the hook's actions; a successful closure selects the door.
   const guidedApi = useMemo<GuidedApi>(
     () => ({
-      start: run.start,
+      start: trackedStart,
       step: run.step,
       disrupt: async (body) => {
-        const r = await run.disrupt(body);
+        const r = await trackedDisrupt(body);
         if (!failureOf(r)) setSelectedId(body.targetId);
         return r;
       },
     }),
-    [run.start, run.step, run.disrupt],
+    [trackedStart, run.step, trackedDisrupt],
   );
 
   return (
@@ -203,10 +235,20 @@ export const DashboardLayout = () => {
             )}
             {run.status === "missing" && !guidedRunning && (
               <span className="text-red-700 dark:text-red-400">
-                Run not found on the server; run the scenario again.
+                RUN_NOT_FOUND: run not found on the server; run the scenario
+                again or watch the recording.
               </span>
             )}
           </GuidedDemo>
+          <TextureButton
+            variant="minimal"
+            size="sm"
+            className="pointer-events-auto w-auto"
+            disabled={run.busy || guidedRunning}
+            onClick={() => void replayRecorded()}
+          >
+            Watch recorded run
+          </TextureButton>
           <CausalTimeline
             events={runView?.timeline ?? TIMELINE_EVENTS}
             runId={snapshot?.runId ?? null}
@@ -242,6 +284,18 @@ export const DashboardLayout = () => {
             }
           />
         </div>
+
+        {run.error === NO_RECORDING && (
+          <output className="pointer-events-auto block rounded-lg border border-zinc-400/60 bg-zinc-50/95 px-3 py-1.5 text-xs text-zinc-900 shadow-sm dark:bg-zinc-900/90 dark:text-zinc-200">
+            No recording yet: no recorded run has been published with this
+            build. Start a live run instead.
+          </output>
+        )}
+        {recording && <ReplayBanner recording={recording} />}
+        <ComparePanel
+          agentsSnapshot={snapshot}
+          disruptions={compareDisruptions}
+        />
 
         <div className="relative min-h-0 flex-1">
           <FacilityPanel

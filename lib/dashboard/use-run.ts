@@ -14,8 +14,10 @@ import type {
   DisruptionBody,
   StepBody,
 } from "@/lib/run/api-schemas";
+import type { RecordedRun } from "@/lib/run/recording";
 import type { RunSnapshot } from "@/types/run";
 import { type DashboardView, projectRun, type RunStatus } from "./project-run";
+import { replayFromRecording } from "./replay";
 import {
   createRunRequest,
   disruptRunRequest,
@@ -57,6 +59,14 @@ export interface UseRunResult {
   step(maxTurns?: StepBody["maxTurns"]): Promise<RunActionResult>;
   disrupt(body: DisruptionBody): Promise<RunActionResult>;
   replay(url: string): Promise<RunActionResult>;
+  /**
+   * Loads the recorded D-108 run (Nebius first, then the fallback and Claude
+   * test recordings), validates it and replays it in the browser. No model
+   * call, no server run.
+   */
+  replayRecorded(): Promise<RunActionResult>;
+  /** The recording behind the current replay snapshot; null otherwise. */
+  recording: RecordedRun | null;
   /** Re-reads the live run from the server, e.g. after an error. */
   refresh(): Promise<RunActionResult>;
 }
@@ -76,6 +86,7 @@ export const useRun = (): UseRunResult => {
   // The ref is the source of truth: sequential awaits and same-tick double
   // clicks read it, not a stale render closure.
   const stateRef = useRef<RunState>(INITIAL_RUN_STATE);
+  const [recording, setRecording] = useState<RecordedRun | null>(null);
 
   const commit = useCallback((next: RunState): RunState => {
     stateRef.current = next;
@@ -138,6 +149,16 @@ export const useRun = (): UseRunResult => {
     [perform],
   );
 
+  const replayRecorded = useCallback(
+    () =>
+      perform("replay", async () => {
+        const result = await replayFromRecording(browserFetch);
+        setRecording(result.recording ?? null);
+        return result.response;
+      }),
+    [perform],
+  );
+
   const refresh = useCallback(
     () =>
       perform(
@@ -163,6 +184,8 @@ export const useRun = (): UseRunResult => {
     step,
     disrupt,
     replay,
+    replayRecorded,
+    recording: state.snapshot?.mode === "replay" ? recording : null,
     refresh,
   };
 };
