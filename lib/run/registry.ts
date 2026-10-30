@@ -4,11 +4,11 @@
  */
 
 import type { Deliberator, ModelTier } from "../../types/run";
+import { createNemotronDeliberator } from "../agents/nemotron-deliberator";
 import type { AgentRole } from "../agents/types";
 import type { CreateRunBody } from "./api-schemas";
 import { BaselineDeliberator } from "./baseline-deliberator";
 import { Run } from "./run";
-import { ScriptedDeliberator } from "./scripted-deliberator";
 
 const MAX_RUNS = 20;
 
@@ -26,8 +26,8 @@ export const tierFor = (role: AgentRole): ModelTier => {
 
 /**
  * Single swap point for deliberators. Baseline mode runs the FCFS rules; every
- * mode falls back to them. Placeholder: ScriptedDeliberator stands in for B2's
- * createNemotronDeliberator() in live mode until it merges.
+ * mode falls back to them. Live mode uses the Nemotron deliberator, which
+ * labels its own fallbacks (no key, HTTP error, timeout, malformed reply).
  */
 const deliberatorsFor = (
   mode: CreateRunBody["mode"],
@@ -35,7 +35,7 @@ const deliberatorsFor = (
   deliberator:
     mode === "baseline"
       ? new BaselineDeliberator()
-      : new ScriptedDeliberator({}),
+      : createNemotronDeliberator(),
   fallbackDeliberator: new BaselineDeliberator(),
 });
 

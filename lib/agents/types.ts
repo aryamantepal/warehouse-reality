@@ -3,7 +3,7 @@
  * Pure TypeScript; no rendering dependencies.
  */
 
-import type { EntityId, ToolResult } from "../engine/types";
+import type { EntityId } from "../engine/types";
 
 export type AgentRole =
   | "driver"
@@ -89,17 +89,4 @@ export interface AgentToolCall {
     | "escalate"
     | "observe";
   parameters: Record<string, unknown>;
-}
-
-export interface DeliberationResult {
-  agentId: EntityId;
-  role: AgentRole;
-  thought: string;
-  isMock: boolean;
-  modelUsed: string;
-  latencyMs: number;
-  toolCall?: AgentToolCall;
-  toolResult?: ToolResult;
-  messageSent?: AgentMessage;
-  escalated?: boolean;
 }
