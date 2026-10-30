@@ -2,6 +2,7 @@
 
 import { TextureButton } from "@/components/ui/texture-button";
 import type { DisruptionBody } from "@/lib/run/api-schemas";
+import { NewsScout } from "./news-scout";
 import { ProvenanceBadge } from "./provenance-badge";
 
 interface DisruptionModalProps {
@@ -98,6 +99,13 @@ export const DisruptionModal = ({
             </div>
           ))}
         </div>
+
+        <NewsScout
+          onInject={(body) => {
+            onInject(body);
+            onClose();
+          }}
+        />
 
         <div className="flex justify-end pt-1">
           <TextureButton

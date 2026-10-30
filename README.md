@@ -122,7 +122,6 @@ Read [the architecture](docs/architecture.md), [submission checklist and demo pl
 - No Nebius recording is committed yet, and no live inference has been verified from this repository.
 - The facility layout is schematic until a site plan is traced, and the UI says so.
 - `docs/architecture.md` is dated October 26 and its numbered gap list partly predates the server-owned run; where they differ, the code wins.
-- The Tavily scout has no button in the disruption modal yet; the route and body adapter exist.
 
 ## Evidence and scope
 

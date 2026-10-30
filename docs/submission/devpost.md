@@ -71,5 +71,5 @@ NVIDIA Nemotron (Nano, Super, Ultra tiers), Nebius Token Factory, Next.js 16, Re
 
 - Change record: the hackathon period started Aug 26 and this project began Oct 10 (from the plan; verify against repo history). `[confirm]`
 - Feedback prize: see `feedback.md`.
-- Tavily prize: `POST /api/disruptions/live` searches Tavily server-side (results cached for 10 minutes per query, rate limited); a live result can be injected as a hypothetical disruption labeled `external_search` with its source URL, and offline fixtures are labeled illustrative. The disruption modal has no scout button yet. `[TODO: confirm the team is entering, and whether a scout button ships before submission]`
+- Tavily prize: `POST /api/disruptions/live` searches Tavily server-side (results cached for 10 minutes per query, rate limited); a live result can be injected as a hypothetical disruption labeled `external_search` with its source URL, and offline fixtures are labeled illustrative. The disruption modal's "News scout (Tavily)" section searches and injects. `[TODO: confirm the team is entering]`
 - Final checks: repo public with the MIT license visible at the root; hosted URL and replay URL work logged out; submit by 09:00 PT Friday.
